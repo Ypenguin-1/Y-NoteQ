@@ -636,7 +636,7 @@
         <div id="loginCard" class="auth-card">
             <div class="auth-logo">
                 <h1>
-                    <img id="loginLogoImg" src="Y-pen-Light.svg" alt="Y-NoteQ Logo" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\'fa-solid fa-book-open\'></i> Y-NoteQ';">
+                    <img id="loginLogoImg" src="Y-pen_icon_Light.svg" alt="Y-NoteQ Logo" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\'fa-solid fa-book-open\'></i> Y-NoteQ';">
                     Y-NoteQ
                 </h1>
                 <p style="font-size: 0.85rem; color: #cbd5e1; margin-top: 5px;">単語暗記管理ノートシステム</p>
@@ -706,7 +706,7 @@
     <!-- アプリヘッダー -->
     <header>
         <a class="header-logo" onclick="switchTab('folder')">
-            <img id="headerLogoImg" src="Y-pen-Light.svg" alt="Y-NoteQ" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\'fa-solid fa-book-open\'></i> <span>Y-NoteQ</span>';">
+            <img id="headerLogoImg" src="Y-pen_icon_Light.svg" alt="Y-NoteQ" onerror="this.onerror=null; this.parentElement.innerHTML='<i class=\'fa-solid fa-book-open\'></i> <span>Y-NoteQ</span>';">
             <span class="header-title">Y-NoteQ</span>
         </a>
 
@@ -1062,7 +1062,7 @@
             <div style="margin-top: 15px; font-size: 0.9rem;">
                 <details open style="margin-bottom: 10px;">
                     <summary style="font-weight: bold; cursor: pointer;">Ver 1.1.0 (2026/08/17)</summary>
-                    <p style="padding: 8px;">・ダークモード切り替えとロゴアイコン（Y-pen-Light/Dark.svg）に対応<br>・「未実施(Level 0)を除く」でのアナリティクス集計処理を修正<br>・フォルダー・単語帳のカスタマイズ機能およびデータ保存処理の動作向上</p>
+                    <p style="padding: 8px;">・ダークモード切り替えとロゴアイコン（Y-pen_icon_Light/Dark.svg）に対応<br>・「未実施(Level 0)を除く」でのアナリティクス集計処理を修正<br>・フォルダー・単語帳のカスタマイズ機能およびデータ保存処理の動作向上</p>
                 </details>
             </div>
         </div>
@@ -1150,7 +1150,7 @@
                 themeIcon.className = isDark ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
             }
             
-            const logoPath = isDark ? 'Y-pen-Dark.svg' : 'Y-pen-Light.svg';
+            const logoPath = isDark ? 'Y-pen_icon_Dark.svg' : 'Y-pen_icon_Light.svg';
             if (logoImg) logoImg.src = logoPath;
             if (loginLogoImg) loginLogoImg.src = logoPath;
         }
