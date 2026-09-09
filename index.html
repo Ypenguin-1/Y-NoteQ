@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Y-NoteQ | 単語暗記管理アプリ</title>
+
+<!-- フォント: 日本語=Noto Sans JP / 英数字=Futura(フォールバックでNoto Sans JPへ) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap" rel="stylesheet">
+<!-- アイコン: 絵文字ではなくFont Awesomeを使用(指示書5番) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     ログイン / 新規登録 画面
+     ============================================================ -->
+<div id="auth-screen" class="auth-screen">
+
+  <!-- ---------- ログインカード ---------- -->
+  <div class="auth-card" id="login-card">
+    <div class="auth-brand">
+      <img src="assets/Y-pen-Light.svg" class="ynq-logo-img" alt="">
+      <span>Y-NoteQ</span>
+    </div>
+    <p class="auth-sub">単語の暗記度を、もっと賢く管理する。</p>
+
+    <div id="login-message" class="auth-message" style="display:none;"></div>
+
+    <form class="auth-form" id="login-form">
+      <div class="field">
+        <label for="login-email">メールアドレス</label>
+        <input type="email" id="login-email" autocomplete="username" required>
+      </div>
+      <div class="field">
+        <label for="login-password">ユーザーパスワード</label>
+        <input type="password" id="login-password" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block">ログイン</button>
+    </form>
+
+    <div class="auth-switch">
+      アカウントをお持ちでない方は
+      <button type="button" id="go-signup">新規登録</button>
+    </div>
+  </div>
+
+  <!-- ---------- 新規登録カード(初期状態は非表示) ---------- -->
+  <div class="auth-card" id="signup-card" style="display:none;">
+    <div class="auth-brand">
+      <img src="assets/Y-pen-Light.svg" class="ynq-logo-img" alt="">
+      <span>Y-NoteQ</span>
+    </div>
+    <h3 style="margin-bottom:4px;">新規登録</h3>
+
+    <div class="step-dots" id="signup-dots">
+      <span class="active" data-step="invite"></span>
+      <span data-step="email"></span>
+      <span data-step="password"></span>
+    </div>
+
+    <div id="signup-message" class="auth-message" style="display:none;"></div>
+
+    <!-- Step 1: 招待コード(6桁) -->
+    <div class="auth-form signup-step" data-step="invite">
+      <p class="field-hint" style="margin-bottom:14px;">招待コード(6桁の数字)を入力してください。</p>
+      <div class="code-inputs">
+        <input maxlength="1" inputmode="numeric" class="invite-digit">
+        <input maxlength="1" inputmode="numeric" class="invite-digit">
+        <input maxlength="1" inputmode="numeric" class="invite-digit">
+        <input maxlength="1" inputmode="numeric" class="invite-digit">
+        <input maxlength="1" inputmode="numeric" class="invite-digit">
+        <input maxlength="1" inputmode="numeric" class="invite-digit">
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="invite-next" style="margin-top:16px;">次へ</button>
+    </div>
+
+    <!-- Step 2: メールアドレス -->
+    <div class="auth-form signup-step" data-step="email" style="display:none;">
+      <div class="field">
+        <label for="signup-email">メールアドレス</label>
+        <input type="email" id="signup-email" placeholder="example@mail.com">
+        <div class="field-hint">「＠」を含む正しい形式で入力してください。</div>
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="email-next">次へ</button>
+    </div>
+
+    <!-- Step 3: パスワード(2回入力) -->
+    <div class="auth-form signup-step" data-step="password" style="display:none;">
+      <div class="field">
+        <label for="signup-pw1">パスワード(8文字以上)</label>
+        <input type="password" id="signup-pw1">
+      </div>
+      <div class="field">
+        <label for="signup-pw2">パスワード(確認のためもう一度)</label>
+        <input type="password" id="signup-pw2">
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="signup-submit">登録する</button>
+    </div>
+
+    <div class="auth-switch">
+      すでにアカウントをお持ちの方は
+      <button type="button" id="go-login">ログイン</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================
+     アプリ本体シェル(ログイン後)
+     ============================================================ -->
+<div id="app-shell" class="app-shell">
+
+  <!-- ---------- ヘッダー ---------- -->
+  <header class="app-header">
+    <div class="header-left">
+      <button class="btn-icon" id="back-btn" title="1つ前に戻る">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+      <button class="brand-btn" id="brand-home-btn" title="ホームに戻る">
+        <img src="assets/Y-pen-Light.svg" class="ynq-logo-img" alt="">
+        <span class="brand-name">Y-NoteQ</span>
+      </button>
+      <span class="wordbook-name" id="current-wordbook-name"></span>
+    </div>
+
+    <div class="header-right">
+      <!-- 使い方 -->
+      <div class="dropdown">
+        <button class="label-btn collapsible" data-dd="howto-panel"><i class="fa-solid fa-circle-question"></i><span class="label-text">使い方</span></button>
+        <div class="dropdown-panel" id="howto-panel"></div>
+      </div>
+      <!-- パッチノート -->
+      <div class="dropdown">
+        <button class="label-btn collapsible" data-dd="patch-panel"><i class="fa-solid fa-clipboard-list"></i><span class="label-text">パッチノート</span></button>
+        <div class="dropdown-panel" id="patch-panel"></div>
+      </div>
+      <!-- 音量 -->
+      <div class="volume-control" title="音量">
+        <i class="fa-solid fa-volume-low"></i>
+        <input type="range" min="0" max="100" value="70" id="volume-range">
+      </div>
+      <!-- ライト/ダーク切替 -->
+      <button class="btn-icon" id="theme-toggle-btn" title="テーマ切り替え"><i class="fa-solid fa-moon"></i></button>
+
+      <!-- 三本線(スマホでヘッダー項目が収まらない時) -->
+      <button class="hamburger-btn" id="hamburger-btn"><i class="fa-solid fa-bars"></i></button>
+
+      <!-- アカウント -->
+      <div class="dropdown">
+        <button class="account-avatar" data-dd="account-panel" style="background:#2a8cef">?</button>
+        <div class="dropdown-panel" id="account-panel">
+          <button class="item" id="menu-profile"><i class="fa-solid fa-id-card"></i> プロフィール</button>
+          <button class="item" id="menu-bug"><i class="fa-solid fa-bug"></i> バグを報告</button>
+          <hr>
+          <button class="item" id="menu-logout"><i class="fa-solid fa-right-from-bracket"></i> ログアウト</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- スマホ用: ハンバーガーから開くメニュー(使い方/パッチノート/音量をまとめる) -->
+  <div class="dropdown-panel" id="mobile-menu-panel" style="position:fixed; right:10px; top:60px;">
+    <button class="item" data-dd-open="howto-panel"><i class="fa-solid fa-circle-question"></i> 使い方</button>
+    <button class="item" data-dd-open="patch-panel"><i class="fa-solid fa-clipboard-list"></i> パッチノート</button>
+    <div class="volume-control" style="padding:10px 12px;"><i class="fa-solid fa-volume-low"></i><input type="range" min="0" max="100" value="70" class="mobile-volume"></div>
+  </div>
+
+  <!-- ---------- タブナビ(PC/タブレット: ヘッダー下) ---------- -->
+  <nav class="tab-nav hidden" id="tab-nav">
+    <button class="tab-btn active" data-tab="folder"><i class="fa-solid fa-folder"></i><span class="tab-label">フォルダー</span></button>
+    <button class="tab-btn" data-tab="list"><i class="fa-solid fa-list"></i><span class="tab-label">単語一覧</span></button>
+    <button class="tab-btn" data-tab="test"><i class="fa-solid fa-pen-ruler"></i><span class="tab-label">テスト</span></button>
+    <button class="tab-btn" data-tab="edit"><i class="fa-solid fa-pen"></i><span class="tab-label">編集</span></button>
+    <button class="tab-btn" data-tab="share"><i class="fa-solid fa-share-nodes"></i><span class="tab-label">共有</span></button>
+  </nav>
+
+  <!-- ---------- メインコンテンツ ---------- -->
+  <main class="app-main">
+
+    <!-- フォルダータブ(=暫定ホーム画面) : index.html内に直接実装 -->
+    <section class="tab-panel active" id="panel-folder">
+      <div class="breadcrumb"></div>
+      <div class="section-head"><h2>フォルダー</h2></div>
+      <div class="card-grid"></div>
+    </section>
+
+    <!-- フォルダー以外のタブ(単語一覧/テスト/編集/共有/アカウント)は
+         tabs/*.html を動的に読み込んでここに注入する -->
+    <section class="tab-panel" id="panel-dynamic">
+      <div id="tab-content-area"></div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    <!-- ●フッター: 指示書84番の通り、内容は検討中。ロゴと最低限のリンクのみ先行設置 -->
+    <div>Y-NoteQ ─ 単語の暗記度を、もっと賢く管理する。</div>
+  </footer>
+
+  <!-- ---------- 下部タブバー(スマホ) ---------- -->
+  <nav class="bottom-tabbar hidden" id="bottom-tabbar">
+    <button class="tab-btn active" data-tab="folder"><i class="fa-solid fa-folder"></i><span class="tab-label">フォルダー</span></button>
+    <button class="tab-btn" data-tab="list"><i class="fa-solid fa-list"></i><span class="tab-label">単語一覧</span></button>
+    <button class="tab-btn" data-tab="test"><i class="fa-solid fa-pen-ruler"></i><span class="tab-label">テスト</span></button>
+    <button class="tab-btn" data-tab="edit"><i class="fa-solid fa-pen"></i><span class="tab-label">編集</span></button>
+    <button class="tab-btn" data-tab="share"><i class="fa-solid fa-share-nodes"></i><span class="tab-label">共有</span></button>
+    <button class="tab-btn" data-tab="account"><i class="fa-solid fa-user"></i><span class="tab-label">アカウント</span></button>
+  </nav>
+</div>
+
+<!-- ---------- 汎用モーダル(フォルダー/単語帳の追加・編集) ---------- -->
+<div class="modal-overlay" id="generic-modal">
+  <div class="modal-box"></div>
+</div>
+
+<!-- ---------- 削除確認モーダル(共通) ---------- -->
+<div class="modal-overlay" id="confirm-modal">
+  <div class="modal-box warn">
+    <h3>削除しますか？</h3>
+    <p></p>
+    <div class="modal-actions">
+      <button class="btn" data-close>キャンセル</button>
+      <button class="btn btn-danger" id="confirm-yes">削除する</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/app.js"></script>
+<script src="js/ui.js" defer></script>
+</body>
+</html>
