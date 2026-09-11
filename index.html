@@ -27,7 +27,8 @@
 
   <div class="auth-card">
     <div class="auth-logo">
-      <img src="assets/Y-pen_icon_Light.svg" alt="Y-NoteQ ロゴ" id="login-logo-img">
+      <!-- ログイン画面の背景は常時ダークなので、白抜きのDark版ロゴを固定使用 -->
+      <img src="assets/Y-pen_icon_Dark.svg" alt="Y-NoteQ ロゴ" id="login-logo-img">
       <span>Y-NoteQ</span>
     </div>
     <p class="auth-subtitle">単語の暗記度を、しっかり管理。</p>
@@ -70,7 +71,8 @@
 
   <div class="auth-card">
     <div class="auth-logo">
-      <img src="assets/Y-pen_icon_Light.svg" alt="Y-NoteQ ロゴ">
+      <!-- ログイン画面と同様、背景が常時ダークなのでDark版ロゴを固定使用 -->
+      <img src="assets/Y-pen_icon_Dark.svg" alt="Y-NoteQ ロゴ">
       <span>Y-NoteQ</span>
     </div>
     <p class="auth-subtitle">新規登録</p>
@@ -140,6 +142,7 @@
   <header id="app-header">
     <div class="header-left">
       <button type="button" class="header-brand" id="btn-logo-home" title="ホームに戻る">
+        <!-- src はテーマに応じて js/app.js の updateHeaderLogo() が Light/Dark を出し分けます -->
         <img src="assets/Y-pen_icon_Light.svg" alt="" id="header-logo-img">
         <span>Y-NoteQ</span>
       </button>
@@ -279,6 +282,13 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 
+<!-- PDF出力(単語一覧タブのPDFダウンロードで使用)
+     ※jsPDFの標準フォントは日本語非対応のため、html2canvasで表を画像化してPDFに貼り付ける方式にしています -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <script src="js/app.js"></script>
+<script src="js/folders.js"></script>
+<script src="js/wordlist.js"></script>
 </body>
 </html>

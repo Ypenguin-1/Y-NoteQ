@@ -224,7 +224,7 @@ body {
   gap: 10px;
   margin-bottom: 8px;
 }
-.auth-logo img { width: 40px; height: 40px; }
+.auth-logo img { height: 40px; width: auto; } /* SVGの縦横比(330x450)を保ったまま高さだけ揃える */
 .auth-logo span {
   font-family: var(--font-en);
   font-weight: 700;
@@ -316,7 +316,7 @@ body {
   padding: 0;
   color: var(--color-text);
 }
-.header-brand img { width: 28px; height: 28px; }
+.header-brand img { height: 28px; width: auto; } /* SVGの縦横比(330x450)を保ったまま高さだけ揃える */
 .header-brand span {
   font-family: var(--font-en);
   font-weight: 700;
@@ -543,6 +543,251 @@ body {
 .toast[hidden] { display: none; }
 
 /* ============================================================
+   7.5 フォルダー・単語帳タブ(tabs/home.html / js/folders.js)
+   ============================================================ */
+.section-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 700;
+}
+.breadcrumb-back {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 15px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 4px;
+}
+.breadcrumb-back:hover { color: var(--color-text); }
+.breadcrumb-icon { color: var(--color-primary-dark); }
+
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px;
+}
+.item-card {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 6px 6px 6px 16px;
+  transition: box-shadow .15s ease, transform .1s ease;
+}
+.item-card:hover { box-shadow: 0 6px 18px var(--color-shadow); }
+.item-card-body {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  background: none;
+  border: none;
+  padding: 12px 4px;
+  text-align: left;
+  color: var(--color-text);
+}
+.item-card-icon { font-size: 22px; flex-shrink: 0; }
+.item-card-name {
+  font-weight: 600;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item-card-actions { display: flex; gap: 2px; flex-shrink: 0; }
+.item-card-actions .btn-icon { width: 34px; height: 34px; font-size: 14px; }
+
+.add-new-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1.5px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text-muted);
+  padding: 20px;
+  min-height: 62px;
+  font-weight: 600;
+}
+.add-new-card:hover { border-color: var(--color-primary); color: var(--color-primary-dark); }
+
+.color-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.color-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+  cursor: pointer;
+}
+.color-swatch.selected { border-color: var(--color-text); box-shadow: 0 0 0 2px var(--color-bg-card); }
+
+.empty-state {
+  grid-column: 1 / -1;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 50px 20px;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+.empty-state i { font-size: 28px; margin-bottom: 10px; color: var(--color-primary); }
+.empty-state h3 { margin: 0 0 6px; font-size: 15px; color: var(--color-text); }
+.empty-state p { margin: 0; font-size: 13px; }
+
+/* ============================================================
+   7.6 単語一覧タブ(tabs/wordlist.html / js/wordlist.js)
+   ============================================================ */
+.panel {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+.panel-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0 0 16px;
+}
+.panel-title i { color: var(--color-primary-dark); }
+
+.analytics-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.analytics-range { display: flex; align-items: center; gap: 8px; }
+.analytics-range input {
+  width: 76px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  text-align: center;
+}
+.checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.checkbox-row input { width: 16px; height: 16px; accent-color: var(--color-primary); }
+
+.analytics-bar {
+  display: flex;
+  width: 100%;
+  height: 26px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: var(--color-bg-elevated);
+  margin-bottom: 14px;
+}
+.analytics-bar-seg {
+  height: 100%;
+  min-width: 0;
+  transition: width .3s ease;
+}
+.analytics-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
+}
+.analytics-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg-elevated);
+}
+.legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+  align-items: end;
+  margin-bottom: 4px;
+}
+.filter-grid .field { margin-bottom: 0; }
+.filter-actions { display: flex; justify-content: flex-end; margin-top: 12px; }
+
+.table-scroll { overflow-x: auto; border: 1px solid var(--color-border); border-radius: var(--radius-md); }
+table.word-table { width: 100%; border-collapse: collapse; font-size: 13px; white-space: nowrap; }
+table.word-table th, table.word-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+}
+table.word-table th {
+  background: var(--color-bg-elevated);
+  font-size: 12px;
+  color: var(--color-text-muted);
+  position: sticky;
+  top: 0;
+}
+table.word-table td.col-word, table.word-table td.col-meaning { white-space: normal; max-width: 240px; }
+table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
+
+.badge-notdone {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--level-0);
+  color: #333;
+  font-size: 11px;
+  font-weight: 700;
+}
+.level-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  color: #1a1a1a;
+  font-weight: 700;
+  font-size: 12px;
+  border: none;
+  cursor: pointer;
+}
+.row-actions { display: flex; gap: 6px; }
+.row-actions .btn { padding: 6px 10px; font-size: 12px; }
+
+.export-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 14px; }
+
+.level-picker-popover {
+  position: fixed;
+  z-index: 220;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 30px var(--color-shadow);
+  padding: 10px;
+  display: flex;
+  gap: 6px;
+}
+.level-picker-popover[hidden] { display: none; }
+
+/* ============================================================
    8. メディアクエリ(レスポンシブ)
    ブレークポイント方針:
    - 1200px以上: デスクトップ(PC)
@@ -590,4 +835,14 @@ body {
 /* 「アカウント」タブはPC以外(タブレット・スマホ)のみ表示(仕様#36) */
 @media (min-width: 768px) {
   .tab-account-mobile { display: none; }
+}
+
+/* フォルダー/単語一覧タブ: スマホでは余白と配置を詰める */
+@media (max-width: 600px) {
+  .panel { padding: 16px; }
+  .analytics-controls { align-items: stretch; }
+  .section-toolbar { align-items: stretch; }
+  .section-toolbar .btn { width: 100%; }
+  .export-actions { flex-wrap: wrap; }
+  .export-actions .btn { flex: 1; }
 }

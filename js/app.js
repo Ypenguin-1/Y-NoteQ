@@ -56,12 +56,37 @@ const HOWTO_CONTENT = [
 // ▼▼ ここから先はユーザーが自由に編集してよい(バージョン追加用コメント) ▼▼
 const PATCH_NOTES = [
   {
+    version: "0.2.0",
+    date: "2026/09/11",
+    items: ["フォルダー・単語帳の作成/編集/削除機能を追加", "単語一覧タブ(アナリティクス・検索フィルター・CSV/PDF出力)を追加"]
+  },
+  {
     version: "0.1.0",
     date: "2026/09/11",
     items: ["ログイン・新規登録機能を追加", "ヘッダー・フッターの骨格を追加", "ライト/ダークモード切替に対応"]
   }
 ];
 // ▲▲ ここまでユーザー編集エリア ▲▲
+
+
+/* ----------------------------------------------------------
+   0.5 共有名前空間(YNQ)
+   js/folders.js・js/wordlist.js など他のJSファイルから
+   Firebaseのインスタンスや共通ユーティリティ、
+   「今どのフォルダー/単語帳を開いているか」を参照できるようにする。
+   ---------------------------------------------------------- */
+const YNQ = {
+  db, auth, LEVEL_COLORS,
+  currentUser: null,   // ログイン中ユーザー(firebase.User)
+  currentFolder: null, // 開いているフォルダー { id, name, color }
+  currentBook: null,   // 開いている単語帳 { id, name, color, folderId }
+  // 以下は関数定義後(このファイルの後半)に中身が確定するが、
+  // function宣言はホイスティングされるためここで参照しても問題ない
+  showToast, openModal, closeModal, confirmDialog, escapeHtml,
+  pad4: (n) => String(n).padStart(4, "0"),
+  hashString
+};
+window.YNQ = YNQ;
 
 
 /* ----------------------------------------------------------
@@ -86,6 +111,13 @@ function closeModal(id) {
   document.getElementById(id).hidden = true;
 }
 
+// ユーザー入力をHTMLに差し込む前にエスケープする(XSS対策)
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str == null ? "" : String(str);
+  return div.innerHTML;
+}
+
 // 文字列から安定したハッシュ値を作る(アイコン色の自動割当に使用)
 function hashString(str) {
   let hash = 0;
@@ -103,6 +135,21 @@ function hashString(str) {
    - ユーザーがボタンで切り替えた場合のみ localStorage に固定保存する
    ---------------------------------------------------------- */
 
+// 現在の実効テーマ("light" or "dark")を、手動設定→なければOS設定の順で判定する
+function getEffectiveTheme() {
+  const manual = document.documentElement.getAttribute("data-theme");
+  if (manual === "light" || manual === "dark") return manual;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
+// ヘッダーのロゴ画像を現在のテーマに合わせて出し分ける
+// (Light.svg=黒アイコン→ライト背景用 / Dark.svg=白アイコン→ダーク背景用)
+function updateHeaderLogo() {
+  const img = document.getElementById("header-logo-img");
+  if (!img) return;
+  img.src = getEffectiveTheme() === "dark" ? "assets/Y-pen_icon_Dark.svg" : "assets/Y-pen_icon_Light.svg";
+}
+
 function applyTheme(theme) {
   // theme: "light" | "dark" | "auto"
   if (theme === "auto") {
@@ -110,17 +157,21 @@ function applyTheme(theme) {
   } else {
     document.documentElement.setAttribute("data-theme", theme);
   }
+  updateHeaderLogo();
 }
 
 function initTheme() {
   const saved = localStorage.getItem("ynoteq-theme") || "auto";
   applyTheme(saved);
+  // "auto"設定時、OSのライト/ダーク切替にもロゴ表示を追従させる
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => {
+    if (!document.documentElement.getAttribute("data-theme")) updateHeaderLogo();
+  });
 }
 
 // ライト/ダークを手動でトグルする(現在の見た目を見て反転させる)
 function toggleTheme() {
-  const isDarkNow = window.matchMedia("(prefers-color-scheme: dark)").matches;
-  const current = document.documentElement.getAttribute("data-theme") || (isDarkNow ? "dark" : "light");
+  const current = getEffectiveTheme();
   const next = current === "dark" ? "light" : "dark";
   localStorage.setItem("ynoteq-theme", next);
   applyTheme(next);
@@ -362,6 +413,14 @@ async function loadAccountBadge(user) {
   badge.style.background = color;
 }
 
+// タブ(tabs/*.html)を読み込んだ直後に呼び出す初期化関数の対応表。
+// fetchしたHTML断片内の<script>はブラウザの仕様上自動実行されないため、
+// 各タブのロジックは js/folders.js・js/wordlist.js 側で定義し、ここから呼び出す。
+const TAB_INIT_HOOKS = {
+  home: () => window.FoldersTab && window.FoldersTab.init(),
+  wordlist: () => window.WordlistTab && window.WordlistTab.init()
+};
+
 // タブの中身(tabs/*.html)を読み込んで #tab-content-area に差し込む
 // ※ file:// で直接開くとブラウザのセキュリティ制限でfetchが失敗するため、
 //   必ずローカルサーバー(Live Server / firebase serve 等)を経由して開いてください。
@@ -370,18 +429,31 @@ async function loadTab(tabName) {
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tab === tabName);
   });
-  // 「フォルダー」タブ以外の時だけ単語帳名エリアを表示する(中身はPhase2で設定)
-  document.getElementById("header-booktitle").hidden = (tabName === "home");
+  // 「フォルダー」タブ以外の時だけ単語帳名エリアを表示する
+  const titleEl = document.getElementById("header-booktitle");
+  titleEl.hidden = (tabName === "home");
+  if (tabName === "home") YNQ.currentBook = null; // フォルダータブに戻ったら単語帳の選択状態を解除
 
   try {
     const res = await fetch(`tabs/${tabName}.html`);
     if (!res.ok) throw new Error(`tabs/${tabName}.html が見つかりません`);
     area.innerHTML = await res.text();
+    if (TAB_INIT_HOOKS[tabName]) TAB_INIT_HOOKS[tabName]();
   } catch (err) {
     console.error("[loadTab]", err);
     area.innerHTML = `<div class="placeholder-card"><i class="fa-solid fa-triangle-exclamation"></i><p>このタブは準備中です(Phase 2以降で実装予定)。</p></div>`;
   }
 }
+YNQ.loadTab = loadTab;
+
+// js/folders.js から呼ばれる: 単語帳を開いて単語一覧タブへ遷移する
+function openWordbook(folder, book) {
+  YNQ.currentFolder = folder;
+  YNQ.currentBook = book;
+  document.getElementById("header-booktitle").textContent = book.name;
+  loadTab("wordlist");
+}
+YNQ.openWordbook = openWordbook;
 
 function setupHeaderInteractions() {
   // ロゴクリックでホーム(フォルダータブ)へ
@@ -481,6 +553,7 @@ function confirmDialog(message, onConfirm) {
    ---------------------------------------------------------- */
 
 auth.onAuthStateChanged((user) => {
+  YNQ.currentUser = user;
   if (user) {
     document.getElementById("screen-login").hidden = true;
     document.getElementById("screen-register").hidden = true;
@@ -491,6 +564,8 @@ auth.onAuthStateChanged((user) => {
   } else {
     document.getElementById("app-shell").hidden = true;
     document.getElementById("tab-bar").hidden = true;
+    YNQ.currentFolder = null;
+    YNQ.currentBook = null;
     showScreen("login");
   }
 });

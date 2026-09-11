@@ -1,0 +1,113 @@
+<!-- ============================================================
+     tabs/wordlist.html
+     「単語一覧」タブの中身(アナリティクス・検索フィルター・単語表)
+     実際の描画・データ取得は js/wordlist.js(WordlistTab.init)が行う。
+     ============================================================ -->
+<div id="wordlist-tab-root">
+
+  <!-- 単語帳が開かれていない場合(フォルダータブから単語帳を開いていない状態) -->
+  <div id="wordlist-empty" class="placeholder-card" hidden>
+    <i class="fa-solid fa-book-open"></i>
+    <p>単語帳が選択されていません。<br>「フォルダー」タブから単語帳を開いてください。</p>
+    <button type="button" class="btn btn-primary" id="btn-goto-folders" style="margin-top:16px;">フォルダーへ移動</button>
+  </div>
+
+  <div id="wordlist-content" hidden>
+
+    <!-- ---------- アナリティクス ---------- -->
+    <section class="panel">
+      <h2 class="panel-title"><i class="fa-solid fa-chart-simple"></i> アナリティクス</h2>
+
+      <div class="analytics-controls">
+        <div class="analytics-range">
+          <label>対象範囲(単語No.)</label>
+          <input type="text" id="analytics-range-from" placeholder="0001" maxlength="4" inputmode="numeric">
+          <span>〜</span>
+          <input type="text" id="analytics-range-to" placeholder="0999" maxlength="4" inputmode="numeric">
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" id="analytics-exclude-notdone">
+          未実施を除く
+        </label>
+      </div>
+
+      <div class="analytics-bar" id="analytics-bar"></div>
+      <div class="analytics-legend" id="analytics-legend"></div>
+    </section>
+
+    <!-- ---------- 検索フィルター ---------- -->
+    <section class="panel">
+      <h2 class="panel-title"><i class="fa-solid fa-filter"></i> 検索フィルター</h2>
+
+      <div class="filter-grid">
+        <div class="field">
+          <label for="filter-no">単語No. <small>(例: 1-10 / 3,5,10)</small></label>
+          <input type="text" id="filter-no" placeholder="例: 1-10, 15">
+        </div>
+        <div class="field">
+          <label for="filter-word">単語</label>
+          <input type="text" id="filter-word" placeholder="部分一致で検索">
+        </div>
+        <div class="field">
+          <label for="filter-meaning">意味</label>
+          <input type="text" id="filter-meaning" placeholder="部分一致で検索">
+        </div>
+        <div class="field">
+          <label for="filter-date">実施日</label>
+          <input type="date" id="filter-date">
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:6px;">
+        <label>暗記度(複数選択可)</label>
+        <div id="filter-level-chips" style="display:flex;flex-wrap:wrap;gap:8px;"><!-- js/wordlist.js が生成 --></div>
+      </div>
+
+      <div class="filter-actions">
+        <button type="button" class="btn btn-secondary" id="btn-filter-clear"><i class="fa-solid fa-rotate-left"></i> クリア</button>
+      </div>
+    </section>
+
+    <!-- ---------- 単語一覧テーブル ---------- -->
+    <section class="panel">
+      <h2 class="panel-title"><i class="fa-solid fa-table-list"></i> 単語一覧</h2>
+
+      <div class="table-scroll">
+        <table class="word-table">
+          <thead>
+            <tr>
+              <th>単語No.</th>
+              <th>単語</th>
+              <th>意味</th>
+              <th>実施日</th>
+              <th>暗記度</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="word-table-body">
+            <tr><td colspan="6" style="text-align:center;color:var(--color-text-muted);padding:30px;">読み込み中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="export-actions">
+        <button type="button" class="btn btn-secondary" id="btn-export-csv"><i class="fa-solid fa-file-csv"></i> CSVダウンロード</button>
+        <button type="button" class="btn btn-secondary" id="btn-export-pdf"><i class="fa-solid fa-file-pdf"></i> PDFダウンロード</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- 単語の詳細モーダル -->
+<div class="modal" id="modal-word-detail" hidden>
+  <div class="modal-box" style="max-width:420px;">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-circle-info"></i> 単語の詳細</h2>
+      <button type="button" class="btn-icon" id="btn-close-word-detail"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="word-detail-body"></div>
+  </div>
+</div>
+
+<!-- 暗記度タップ時のLevel選択ポップオーバー(1〜5のみ。0への手動変更は不可=仕様#41) -->
+<div class="level-picker-popover" id="level-picker-popover" hidden></div>
