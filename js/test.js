@@ -114,7 +114,7 @@ window.TestTab = (function () {
   function bindSettingsEvents() {
     bindToggleGroup("test-set-direction", true);
     bindToggleGroup("test-set-scoring-timing", true);
-    bindToggleGroup("test-set-levels", false, updateCandidatePool);
+    YNQ.bindLevelToggleGroup("test-set-levels", false, updateCandidatePool); // 仕様修正2026/09/12 #2: 各Level自身の色で表示
     bindToggleGroup("test-set-format", true);
     bindToggleGroup("test-set-show-level", true);
     bindToggleGroup("test-set-level-scoring", true);
@@ -360,7 +360,12 @@ window.TestTab = (function () {
     if (settings.timeLimitMode === "perQuestion") stopTimer();
 
     const levelBefore = currentWord.level || 0;
-    const levelAfter = settings.levelScoring ? nextLevel(levelBefore, isCorrect) : levelBefore;
+    const streakBefore = currentWord.correctStreak || 0;
+    const update = settings.levelScoring
+      ? computeLevelUpdate(levelBefore, streakBefore, isCorrect)
+      : { level: levelBefore, streak: streakBefore };
+    const levelAfter = update.level;
+    currentWord.correctStreak = update.streak; // 同じ単語帳内で同じ単語が連続出題される場合に備えてローカルにも反映
 
     answers.push({
       wordId: currentWord.id,
@@ -368,7 +373,7 @@ window.TestTab = (function () {
       prompt: document.getElementById("test-question-prompt").textContent,
       correctAnswer: firstAlt(currentWord[currentAnswerField]),
       userAnswer: userAnswerDisplay,
-      isCorrect, levelBefore, levelAfter
+      isCorrect, levelBefore, levelAfter, streakAfter: update.streak
     });
 
     if (settings.scoringTiming === "each") {
@@ -378,12 +383,25 @@ window.TestTab = (function () {
     }
   }
 
-  // Level採点(仕様#66): 正解ほど数値を下げ(1が下限)、不正解ほど数値を上げる(5が上限)。
-  // 仕様#41により0(未実施)へは戻さない。
-  function nextLevel(current, isCorrect) {
+  // Level採点(仕様修正2026/09/12 #1):
+  // ・不正解は即座にLevelを+1(5が上限)。
+  // ・正解は2回連続して初めてLevelを-1(1が下限)。1回だけの正解では変動せず、
+  //   「あと1回正解でLevel down」という連続正解カウントだけを進める。
+  // ・Level1はこれ以上下げる必要がないため、連続カウント不要でそのまま1を維持する(仕様#1)。
+  // ・仕様#41により0(未実施)へは戻さない。0からの初回正解はLevel1への移行として扱う。
+  function computeLevelUpdate(current, streak, isCorrect) {
     const cur = current || 0;
-    if (isCorrect) return cur <= 1 ? 1 : cur - 1;
-    return cur === 0 ? 1 : Math.min(5, cur + 1);
+    if (!isCorrect) {
+      return { level: cur === 0 ? 1 : Math.min(5, cur + 1), streak: 0 };
+    }
+    if (cur <= 1) {
+      return { level: 1, streak: 0 };
+    }
+    const newStreak = (streak || 0) + 1;
+    if (newStreak >= 2) {
+      return { level: cur - 1, streak: 0 };
+    }
+    return { level: cur, streak: newStreak };
   }
 
   function showFeedback(isCorrect) {
@@ -453,15 +471,20 @@ window.TestTab = (function () {
       if (settings.levelScoring && total > 0) {
         const batch = YNQ.db.batch();
         const today = todayFormatted();
+        // Levelが変わらなくても、次回1回正解でLevel downする「連続正解カウント」自体は
+        // 毎回保存する必要があるため、回答したすべての単語を書き込み対象にする
         answers.forEach(a => {
-          if (a.levelAfter !== a.levelBefore) {
-            batch.update(wordsRef().doc(a.wordId), { level: a.levelAfter, lastTestDate: today, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
-          }
+          batch.update(wordsRef().doc(a.wordId), {
+            level: a.levelAfter,
+            correctStreak: a.streakAfter || 0,
+            lastTestDate: today,
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
         });
         await batch.commit();
         answers.forEach(a => {
           const w = allWords.find(x => x.id === a.wordId);
-          if (w) { w.level = a.levelAfter; w.lastTestDate = today; }
+          if (w) { w.level = a.levelAfter; w.correctStreak = a.streakAfter || 0; w.lastTestDate = today; }
         });
       }
 
@@ -520,10 +543,14 @@ window.TestTab = (function () {
         const lv = Number(btn.dataset.setLevel);
         const a = answers[idx];
         a.levelAfter = lv;
+        a.streakAfter = 0; // 手動修正のため、連続正解カウントはリセットする
         try {
-          await wordsRef().doc(a.wordId).update({ level: lv, lastTestDate: todayFormatted(), updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+          await wordsRef().doc(a.wordId).update({
+            level: lv, correctStreak: 0, lastTestDate: todayFormatted(),
+            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+          });
           const w = allWords.find(x => x.id === a.wordId);
-          if (w) { w.level = lv; w.lastTestDate = todayFormatted(); }
+          if (w) { w.level = lv; w.correctStreak = 0; w.lastTestDate = todayFormatted(); }
           renderResults();
         } catch (err) {
           console.error("[test:openResultLevelPicker]", err);

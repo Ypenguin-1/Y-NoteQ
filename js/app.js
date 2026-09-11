@@ -95,6 +95,7 @@ const YNQ = {
   // 以下は関数定義後(このファイルの後半)に中身が確定するが、
   // function宣言はホイスティングされるためここで参照しても問題ない
   showToast, openModal, closeModal, confirmDialog, escapeHtml, exportTableAsPdf,
+  bindLevelToggleGroup, setLevelToggleValue,
   pad4: (n) => String(n).padStart(4, "0"),
   hashString
 };
@@ -162,6 +163,48 @@ async function exportTableAsPdf(tableEl, title, filename) {
   }
 
   doc.save(filename);
+}
+
+// Level(0〜5)を選ぶボタン群専用: 選択中のボタンをメインカラーではなく、
+// そのLevel自身の色(LEVEL_COLORS)で塗る(仕様修正2026/09/12 #2)
+function applyLevelToggleStyle(btn) {
+  const lv = Number(btn.dataset.value);
+  if (btn.classList.contains("active")) {
+    btn.style.background = LEVEL_COLORS[lv];
+    btn.style.borderColor = LEVEL_COLORS[lv];
+    btn.style.color = "#1a1a1a";
+  } else {
+    btn.style.background = "";
+    btn.style.borderColor = "";
+    btn.style.color = "";
+  }
+}
+
+// Level選択ボタン群の単一/複数選択を切り替える(押下ごとにapplyLevelToggleStyleで色反映)
+function bindLevelToggleGroup(containerId, singleSelect, onChange) {
+  const wrap = document.getElementById(containerId);
+  wrap.querySelectorAll(".btn-toggle").forEach(btn => {
+    applyLevelToggleStyle(btn); // HTML側に最初から active が付いている場合の初期反映
+    btn.addEventListener("click", () => {
+      if (singleSelect) {
+        wrap.querySelectorAll(".btn-toggle").forEach(b => { b.classList.remove("active"); applyLevelToggleStyle(b); });
+        btn.classList.add("active");
+      } else {
+        btn.classList.toggle("active");
+      }
+      applyLevelToggleStyle(btn);
+      if (onChange) onChange();
+    });
+  });
+}
+
+// Level選択ボタン群の選択状態をJSから設定する(values は数値 または 数値の配列)
+function setLevelToggleValue(containerId, values) {
+  const arr = Array.isArray(values) ? values : [values];
+  document.querySelectorAll(`#${containerId} .btn-toggle`).forEach(b => {
+    b.classList.toggle("active", arr.includes(Number(b.dataset.value)));
+    applyLevelToggleStyle(b);
+  });
 }
 
 // 文字列から安定したハッシュ値を作る(アイコン色の自動割当に使用)
@@ -470,10 +513,10 @@ const TAB_INIT_HOOKS = {
   account: () => window.AccountTab && window.AccountTab.init()
 };
 
-// タブの中身(tabs/*.html)を読み込んで #tab-content-area に差し込む
+// タブの中身(tabs/*.html)を読み込んで #tab-content-area に差し込む(履歴には残さない実処理本体)。
 // ※ file:// で直接開くとブラウザのセキュリティ制限でfetchが失敗するため、
 //   必ずローカルサーバー(Live Server / firebase serve 等)を経由して開いてください。
-async function loadTab(tabName) {
+async function renderTab(tabName) {
   const area = document.getElementById("tab-content-area");
   document.querySelectorAll(".tab-btn").forEach(btn => {
     btn.classList.toggle("active", btn.dataset.tab === tabName);
@@ -482,6 +525,10 @@ async function loadTab(tabName) {
   const titleEl = document.getElementById("header-booktitle");
   titleEl.hidden = (tabName === "home");
   if (tabName === "home") YNQ.currentBook = null; // フォルダータブに戻ったら単語帳の選択状態を解除
+
+  // 仕様修正2026/09/12 #3: フォルダー一覧/単語帳一覧を見ている間はタブバー自体を非表示にし、
+  // 単語帳を開いている(フォルダー以外のタブにいる)時だけタブの項目を表示する
+  document.getElementById("tab-bar").hidden = (tabName === "home");
 
   try {
     const res = await fetch(`tabs/${tabName}.html`);
@@ -493,7 +540,56 @@ async function loadTab(tabName) {
     area.innerHTML = `<div class="placeholder-card"><i class="fa-solid fa-triangle-exclamation"></i><p>このタブは準備中です(Phase 2以降で実装予定)。</p></div>`;
   }
 }
+
+/* ----------------------------------------------------------
+   7.5 画面内「戻る」ナビゲーション(仕様修正2026/09/12 #5)
+   ブラウザの History API を使い、タブ/フォルダーの移動を1手ずつ記録する。
+   ヘッダーの「←」ボタンは history.back() を呼ぶだけで、
+   popstate イベント側で実際の画面復元を行う。
+   ---------------------------------------------------------- */
+let navHistoryStarted = false;
+
+function currentNavState(tabName) {
+  return {
+    tab: tabName,
+    folderId: YNQ.currentFolder ? YNQ.currentFolder.id : null,
+    folderName: YNQ.currentFolder ? YNQ.currentFolder.name : null,
+    folderColor: YNQ.currentFolder ? YNQ.currentFolder.color : null,
+    bookId: YNQ.currentBook ? YNQ.currentBook.id : null,
+    bookName: YNQ.currentBook ? YNQ.currentBook.name : null,
+    bookColor: YNQ.currentBook ? YNQ.currentBook.color : null
+  };
+}
+
+// 現在の状態を履歴に積む。ログイン直後の最初の1回だけ replaceState にして、
+// アプリを開いた瞬間に「戻る」を押しても圏外に出てしまわないようにしている。
+function pushNavState(tabName) {
+  const state = currentNavState(tabName);
+  if (!navHistoryStarted) {
+    history.replaceState(state, "", "#" + tabName);
+    navHistoryStarted = true;
+  } else {
+    history.pushState(state, "", "#" + tabName);
+  }
+}
+
+// タブの中身を読み込んで表示し、履歴にも積む(アプリ内のタブ遷移は基本的にこちらを呼ぶ)
+function loadTab(tabName) {
+  pushNavState(tabName);
+  return renderTab(tabName);
+}
 YNQ.loadTab = loadTab;
+YNQ.pushNavState = pushNavState;
+
+// ブラウザの「戻る/進む」操作(ヘッダーの←ボタンも history.back() 経由でここに来る)
+window.addEventListener("popstate", (e) => {
+  const state = e.state;
+  if (!state) return; // アプリ読み込み前の状態などは無視
+  YNQ.currentFolder = state.folderId ? { id: state.folderId, name: state.folderName, color: state.folderColor } : null;
+  YNQ.currentBook = state.bookId ? { id: state.bookId, name: state.bookName, color: state.bookColor } : null;
+  if (state.bookId) document.getElementById("header-booktitle").textContent = state.bookName;
+  renderTab(state.tab);
+});
 
 // js/folders.js から呼ばれる: 単語帳を開いて単語一覧タブへ遷移する
 function openWordbook(folder, book) {
@@ -505,8 +601,11 @@ function openWordbook(folder, book) {
 YNQ.openWordbook = openWordbook;
 
 function setupHeaderInteractions() {
-  // ロゴクリックでホーム(フォルダータブ)へ
-  document.getElementById("btn-logo-home").addEventListener("click", () => loadTab("home"));
+  // ロゴクリックでホーム(フォルダー一覧のルート)へ。開いているフォルダーの選択状態もリセットする
+  document.getElementById("btn-logo-home").addEventListener("click", () => {
+    YNQ.currentFolder = null;
+    loadTab("home");
+  });
 
   // 戻るボタン(簡易実装。詳細な内部履歴管理はPhase2以降で拡張予定)
   document.getElementById("btn-back").addEventListener("click", () => history.back());
@@ -607,14 +706,14 @@ auth.onAuthStateChanged((user) => {
     document.getElementById("screen-login").hidden = true;
     document.getElementById("screen-register").hidden = true;
     document.getElementById("app-shell").hidden = false;
-    document.getElementById("tab-bar").hidden = false;
     loadAccountBadge(user);
-    loadTab("home");
+    loadTab("home"); // タブバー自体の表示/非表示は renderTab 側で制御する
   } else {
     document.getElementById("app-shell").hidden = true;
     document.getElementById("tab-bar").hidden = true;
     YNQ.currentFolder = null;
     YNQ.currentBook = null;
+    navHistoryStarted = false; // 次回ログイン時にまた履歴の起点をやり直せるようにする
     showScreen("login");
   }
 });

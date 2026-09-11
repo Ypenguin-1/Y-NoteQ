@@ -237,11 +237,12 @@ window.WordlistTab = (function () {
     try {
       await wordsRef().doc(wordId).update({
         level,
+        correctStreak: 0, // 手動変更のため、テストの連続正解カウントはリセットする
         lastTestDate: todayFormatted(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       const w = allWords.find(x => x.id === wordId);
-      if (w) { w.level = level; w.lastTestDate = todayFormatted(); }
+      if (w) { w.level = level; w.correctStreak = 0; w.lastTestDate = todayFormatted(); }
       renderAnalytics();
       applyFilters();
     } catch (err) {
@@ -255,11 +256,12 @@ window.WordlistTab = (function () {
       try {
         await wordsRef().doc(wordId).update({
           level: 0,
+          correctStreak: 0,
           lastTestDate: firebase.firestore.FieldValue.delete(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         const w = allWords.find(x => x.id === wordId);
-        if (w) { w.level = 0; w.lastTestDate = null; }
+        if (w) { w.level = 0; w.correctStreak = 0; w.lastTestDate = null; }
         renderAnalytics();
         applyFilters();
         YNQ.showToast("未実施に戻しました");

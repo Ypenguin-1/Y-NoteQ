@@ -64,6 +64,7 @@ window.FoldersTab = (function () {
     `;
     document.getElementById("btn-back-to-folders").addEventListener("click", () => {
       YNQ.currentFolder = null;
+      YNQ.pushNavState("home"); // 仕様修正2026/09/12 #5: ヘッダーの「戻る」で1つ前(フォルダー一覧)に戻れるようにする
       render();
     });
     document.getElementById("btn-add-new-label").textContent = "新規単語帳";
@@ -80,10 +81,39 @@ window.FoldersTab = (function () {
       }
       grid.innerHTML = books.map(b => itemCardHtml(b, "book")).join("");
       books.forEach(b => bindCardEvents(grid, b, "book"));
+      loadBookProgress(folder.id, books); // 仕様#4: 単語帳ごとのLevel別進捗をひと目で分かるように非同期で追加表示
     } catch (err) {
       console.error("[folders:renderWordbooks]", err);
       grid.innerHTML = emptyStateHtml("読み込みに失敗しました", err.message, "fa-triangle-exclamation");
     }
+  }
+
+  // 各単語帳の中の単語を集計し、カード内にLevel別のミニ進捗バーを表示する
+  async function loadBookProgress(folderId, books) {
+    await Promise.all(books.map(async (b) => {
+      const el = document.querySelector(`.item-progress[data-book-id="${CSS.escape(b.id)}"]`);
+      if (!el) return;
+      try {
+        const wsnap = await wordsCol(folderId, b.id).get();
+        const counts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        wsnap.forEach(d => { const lv = d.data().level || 0; counts[lv] = (counts[lv] || 0) + 1; });
+        const total = wsnap.size;
+        if (total === 0) {
+          el.innerHTML = `<span class="item-progress-empty">単語なし</span>`;
+          return;
+        }
+        const order = [1, 2, 3, 4, 5, 0]; // 仕様#45と同じ並び順
+        el.innerHTML = `
+          <div class="item-progress-bar">${order.map(lv => {
+            const pct = (counts[lv] / total) * 100;
+            return pct > 0 ? `<div class="item-progress-seg" style="width:${pct}%;background:${YNQ.LEVEL_COLORS[lv]}" title="Level${lv}: ${counts[lv]}件"></div>` : "";
+          }).join("")}</div>
+          <span class="item-progress-count">${total}語</span>`;
+      } catch (err) {
+        console.error("[folders:loadBookProgress]", err);
+        el.innerHTML = `<span class="item-progress-empty">取得失敗</span>`;
+      }
+    }));
   }
 
   function emptyStateHtml(title, body, icon) {
@@ -93,16 +123,23 @@ window.FoldersTab = (function () {
   function itemCardHtml(item, kind) {
     const icon = kind === "book" ? "fa-book" : "fa-folder";
     const color = item.color || ITEM_COLORS[0];
+    // 単語帳カードのみ、下段にLevel別ミニ進捗バーの差し込み枠を追加する(仕様#4)
+    const progressRow = kind === "book"
+      ? `<div class="item-progress" data-book-id="${item.id}"><span class="item-progress-loading">読み込み中...</span></div>`
+      : "";
     return `
       <div class="item-card" data-id="${item.id}">
-        <button type="button" class="item-card-body" data-action="open">
-          <i class="fa-solid ${icon} item-card-icon" style="color:${color}"></i>
-          <span class="item-card-name">${YNQ.escapeHtml(item.name)}</span>
-        </button>
-        <div class="item-card-actions">
-          <button type="button" class="btn-icon" data-action="edit" title="編集"><i class="fa-solid fa-pen"></i></button>
-          <button type="button" class="btn-icon" data-action="delete" title="削除"><i class="fa-solid fa-trash"></i></button>
+        <div class="item-card-row">
+          <button type="button" class="item-card-body" data-action="open">
+            <i class="fa-solid ${icon} item-card-icon" style="color:${color}"></i>
+            <span class="item-card-name">${YNQ.escapeHtml(item.name)}</span>
+          </button>
+          <div class="item-card-actions">
+            <button type="button" class="btn-icon" data-action="edit" title="編集"><i class="fa-solid fa-pen"></i></button>
+            <button type="button" class="btn-icon" data-action="delete" title="削除"><i class="fa-solid fa-trash"></i></button>
+          </div>
         </div>
+        ${progressRow}
       </div>`;
   }
 
@@ -112,6 +149,7 @@ window.FoldersTab = (function () {
     card.querySelector('[data-action="open"]').addEventListener("click", () => {
       if (kind === "folder") {
         YNQ.currentFolder = item;
+        YNQ.pushNavState("home"); // 仕様修正2026/09/12 #5: フォルダーを開く操作も履歴に積む
         render();
       } else {
         YNQ.openWordbook(YNQ.currentFolder, item);
@@ -129,6 +167,10 @@ window.FoldersTab = (function () {
     document.getElementById("btn-close-item-edit").addEventListener("click", () => YNQ.closeModal("modal-item-edit"));
     document.getElementById("btn-item-edit-cancel").addEventListener("click", () => YNQ.closeModal("modal-item-edit"));
     document.getElementById("btn-item-edit-save").addEventListener("click", saveItem);
+    document.getElementById("item-edit-custom-color").addEventListener("input", (e) => {
+      editState.color = e.target.value;
+      document.querySelectorAll("#item-edit-colors .color-swatch").forEach(b => b.classList.remove("selected"));
+    });
   }
 
   function openEditModal(kind, item) {
@@ -152,8 +194,11 @@ window.FoldersTab = (function () {
       btn.addEventListener("click", () => {
         editState.color = btn.dataset.color;
         wrap.querySelectorAll(".color-swatch").forEach(b => b.classList.toggle("selected", b === btn));
+        document.getElementById("item-edit-custom-color").value = editState.color;
       });
     });
+    // 仕様#8: プリセットに加えてRGBを自由に選べるネイティブカラーピッカー
+    document.getElementById("item-edit-custom-color").value = editState.color;
   }
 
   async function saveItem() {

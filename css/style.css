@@ -431,11 +431,19 @@ body {
 .mobile-menu-panel .header-nav-link { text-align: left; padding: 14px 10px; font-size: 15px; }
 .mobile-menu-close { align-self: flex-end; }
 
-/* ---- タブバー(place holder / Phase2以降で機能実装) ---- */
+/* ---- タブバー: PC・スマホ問わず画面最下部(フッターの上)に固定表示する(仕様修正 2026/09/12)
+   ・フォルダー一覧/単語帳一覧を見ている間(単語帳が未選択)は非表示にし、
+     単語帳を開いている間だけ表示する(js/app.js の loadTab が hidden を制御)。 ---- */
 #tab-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
   display: flex;
   background: var(--color-bg-card);
-  border-bottom: 1px solid var(--color-border);
+  border-top: 1px solid var(--color-border);
+  padding-bottom: env(safe-area-inset-bottom, 0);
 }
 #tab-bar[hidden] { display: none; }
 .tab-btn {
@@ -456,7 +464,7 @@ body {
 /* ---- メインコンテンツ ---- */
 #tab-content-area {
   flex: 1;
-  padding: 24px 20px 40px;
+  padding: 24px 20px 90px; /* 下部固定タブバーの高さ分、常に余白を確保 */
   max-width: 1100px;
   width: 100%;
   margin: 0 auto;
@@ -470,17 +478,10 @@ body {
 }
 .placeholder-card i { font-size: 32px; margin-bottom: 12px; color: var(--color-primary); }
 
-/* ---- フッター(暫定) ---- */
-#app-footer {
-  height: var(--footer-height);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--color-text-muted);
-  border-top: 1px solid var(--color-border);
-}
+/* ---- フッター(暫定) ----
+   タブバーが画面最下部を占有するため、アプリ本体表示中は常に非表示にしている。
+   フッターの仕様(仕様書#84、検討中)が具体化したら改めて表示方法を検討する。 ---- */
+#app-footer { display: none; }
 
 /* ---------- 6. モーダル(使い方 / パッチノート) ---------- */
 .modal {
@@ -583,15 +584,19 @@ body {
 }
 .item-card {
   display: flex;
-  align-items: center;
-  gap: 4px;
+  flex-direction: column;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: 6px 6px 6px 16px;
   transition: box-shadow .15s ease, transform .1s ease;
 }
 .item-card:hover { box-shadow: 0 6px 18px var(--color-shadow); }
+.item-card-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 6px 6px 16px;
+}
 .item-card-body {
   flex: 1;
   display: flex;
@@ -640,6 +645,32 @@ body {
   cursor: pointer;
 }
 .color-swatch.selected { border-color: var(--color-text); box-shadow: 0 0 0 2px var(--color-bg-card); }
+
+/* 任意の色(RGB)を選べるネイティブカラーピッカー(仕様#8追加分) */
+.color-custom-row { display: flex; align-items: center; gap: 8px; margin-top: 10px; }
+.color-custom-row input[type="color"] {
+  width: 40px;
+  height: 32px;
+  padding: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
+  cursor: pointer;
+}
+
+/* フォルダー/単語帳カード内の暗記度ミニ進捗バー(仕様#4追加分) */
+.item-progress { padding: 0 16px 14px; display: flex; align-items: center; gap: 10px; }
+.item-progress-bar {
+  flex: 1;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  display: flex;
+  background: var(--color-bg-elevated);
+}
+.item-progress-seg { height: 100%; }
+.item-progress-count { font-size: 11px; color: var(--color-text-muted); flex-shrink: 0; white-space: nowrap; }
+.item-progress-empty, .item-progress-loading { font-size: 11px; color: var(--color-text-muted); }
 
 .empty-state {
   grid-column: 1 / -1;
@@ -765,7 +796,7 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   justify-content: center;
   width: 26px;
   height: 26px;
-  border-radius: 50%;
+  border-radius: var(--radius-sm); /* 仕様修正2026/09/12: 丸→四角(角丸) */
   color: #1a1a1a;
   font-weight: 700;
   font-size: 12px;
@@ -914,8 +945,23 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   font-weight: 800;
   font-family: var(--font-en);
 }
-.account-profile-info h2 { margin: 0 0 4px; font-size: 18px; }
-.account-profile-info p { margin: 0; font-size: 13px; color: var(--color-text-muted); }
+.account-profile-info p { margin: 4px 0 0; font-size: 13px; color: var(--color-text-muted); }
+.account-username-row { display: flex; align-items: center; gap: 6px; }
+.account-username-input {
+  font-size: 18px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--color-text);
+  max-width: 220px;
+}
+.account-username-input:hover, .account-username-input:focus {
+  border-color: var(--color-border);
+  background: var(--color-bg);
+  outline: none;
+}
 
 /* ============================================================
    8. メディアクエリ(レスポンシブ)
@@ -926,9 +972,9 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
    -   576px未満: スマホ縦
    ============================================================ */
 
-/* タブレット以下: コンテンツ余白を詰める */
+/* タブレット以下: コンテンツ左右の余白を詰める */
 @media (max-width: 991px) {
-  #tab-content-area { padding: 18px 14px 90px; } /* 下部タブバー分の余白は後日調整 */
+  #tab-content-area { padding-left: 14px; padding-right: 14px; }
 }
 
 /* 860px未満: 「使い方」「パッチノート」の文字リンクのみハンバーガーに集約する。
@@ -938,21 +984,6 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
     display: none;
   }
   .header-hamburger { display: inline-flex; }
-}
-
-/* スマホ横〜縦: タブバーを下部固定に(Phase2で本実装予定・骨格のみ) */
-@media (max-width: 767px) {
-  #tab-bar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 40;
-    border-top: 1px solid var(--color-border);
-    border-bottom: none;
-    padding-bottom: env(safe-area-inset-bottom, 0);
-  }
-  #app-footer { display: none; } /* スマホでは下部タブバーと競合するため非表示 */
 }
 
 /* スマホ縦 */

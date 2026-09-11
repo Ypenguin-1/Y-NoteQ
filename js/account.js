@@ -11,6 +11,14 @@ window.AccountTab = (function () {
     loadProfile();
     loadLevelAggregate();
     loadTestHistory();
+    bindEvents();
+  }
+
+  function bindEvents() {
+    document.getElementById("btn-save-username").addEventListener("click", saveUsername);
+    document.getElementById("account-username-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") saveUsername();
+    });
   }
 
   /* ---------- プロフィール(ユーザーネーム・アイコン) ---------- */
@@ -32,10 +40,31 @@ window.AccountTab = (function () {
       console.error("[account:loadProfile]", err);
     }
 
-    document.getElementById("account-username").textContent = username;
+    document.getElementById("account-username-input").value = username;
     const avatarEl = document.getElementById("account-avatar-large");
     avatarEl.textContent = username[0] ? username[0].toUpperCase() : "?";
     avatarEl.style.background = color;
+  }
+
+  // 仕様#6: プロフィール欄でユーザーネームを変更できるようにする
+  async function saveUsername() {
+    const input = document.getElementById("account-username-input");
+    const newName = input.value.trim();
+    if (!newName) { YNQ.showToast("ユーザーネームを入力してください"); return; }
+
+    const btn = document.getElementById("btn-save-username");
+    btn.disabled = true;
+    try {
+      await YNQ.db.collection("users").doc(YNQ.currentUser.uid).set({ username: newName }, { merge: true });
+      input.value = newName;
+      document.getElementById("account-avatar-large").textContent = newName[0].toUpperCase();
+      YNQ.showToast("ユーザーネームを更新しました");
+    } catch (err) {
+      console.error("[account:saveUsername]", err);
+      YNQ.showToast("更新に失敗しました");
+    } finally {
+      btn.disabled = false;
+    }
   }
 
   /* ---------- 個人Level(collectionGroupで全単語帳の単語を横断集計) ---------- */

@@ -67,28 +67,12 @@ window.EditTab = (function () {
     tbody.querySelectorAll('[data-action="delete"]').forEach(btn => btn.addEventListener("click", () => deleteWord(btn.dataset.id)));
   }
 
-  /* ---------- 共通ユーティリティ ---------- */
-  function bindToggleGroup(containerId, singleSelect) {
-    const wrap = document.getElementById(containerId);
-    wrap.querySelectorAll(".btn-toggle").forEach(btn => {
-      btn.addEventListener("click", () => {
-        if (singleSelect) {
-          wrap.querySelectorAll(".btn-toggle").forEach(b => b.classList.remove("active"));
-          btn.classList.add("active");
-        } else {
-          btn.classList.toggle("active");
-        }
-      });
-    });
-  }
+  /* ---------- 共通ユーティリティ ----------
+     Level選択ボタン群(それぞれのLevel自身の色で表示)は
+     js/app.js の YNQ.bindLevelToggleGroup / YNQ.setLevelToggleValue を利用する(仕様修正2026/09/12 #2)。 */
   function getToggleValue(containerId) {
     const active = document.querySelector(`#${containerId} .btn-toggle.active`);
     return active ? Number(active.dataset.value) : null;
-  }
-  function setToggleValue(containerId, value) {
-    document.querySelectorAll(`#${containerId} .btn-toggle`).forEach(b => {
-      b.classList.toggle("active", Number(b.dataset.value) === value);
-    });
   }
   function parseNoQuery(str) {
     if (!str) return null;
@@ -116,16 +100,16 @@ window.EditTab = (function () {
 
   /* ---------- ①直接入力で単語を追加 ---------- */
   function bindEvents() {
-    bindToggleGroup("add-word-level", true);
+    YNQ.bindLevelToggleGroup("add-word-level", true);
     document.getElementById("btn-add-word").addEventListener("click", addWord);
 
     document.getElementById("import-file-input").addEventListener("change", handleImportFile);
 
     document.getElementById("btn-bulk-apply-level").addEventListener("click", bulkApplyLevel);
     document.getElementById("btn-bulk-delete").addEventListener("click", bulkDelete);
-    bindToggleGroup("bulk-level-group", true);
+    YNQ.bindLevelToggleGroup("bulk-level-group", true);
 
-    bindToggleGroup("edit-word-level-group", true);
+    YNQ.bindLevelToggleGroup("edit-word-level-group", true);
     document.getElementById("btn-close-word-edit").addEventListener("click", () => YNQ.closeModal("modal-word-edit"));
     document.getElementById("btn-word-edit-cancel").addEventListener("click", () => YNQ.closeModal("modal-word-edit"));
     document.getElementById("btn-word-edit-save").addEventListener("click", saveWordEdit);
@@ -148,7 +132,7 @@ window.EditTab = (function () {
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
       wordInput.value = ""; meaningInput.value = "";
-      setToggleValue("add-word-level", 0);
+      YNQ.setLevelToggleValue("add-word-level", 0);
       YNQ.showToast("単語を追加しました");
       await loadWords();
     } catch (err) {
@@ -231,7 +215,7 @@ window.EditTab = (function () {
     YNQ.confirmDialog(`${targets.length}件の暗記度を Level ${level === 0 ? "未実施" : level} に一括変更しますか?`, async () => {
       try {
         await commitInChunks(targets, (batch, w) => {
-          const data = { level, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+          const data = { level, correctStreak: 0, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
           if (level === 0) data.lastTestDate = firebase.firestore.FieldValue.delete();
           batch.update(wordsRef().doc(w.id), data);
         });
@@ -270,7 +254,7 @@ window.EditTab = (function () {
     document.getElementById("edit-word-word").value = w.word;
     document.getElementById("edit-word-meaning").value = w.meaning;
     document.getElementById("edit-word-error").textContent = "";
-    setToggleValue("edit-word-level-group", w.level || 0);
+    YNQ.setLevelToggleValue("edit-word-level-group", w.level || 0);
     YNQ.openModal("modal-word-edit");
   }
 
@@ -288,7 +272,7 @@ window.EditTab = (function () {
     const saveBtn = document.getElementById("btn-word-edit-save");
     saveBtn.disabled = true;
     try {
-      const data = { no, word, meaning, level, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
+      const data = { no, word, meaning, level, correctStreak: 0, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
       if (level === 0) data.lastTestDate = firebase.firestore.FieldValue.delete();
       await wordsRef().doc(editingWordId).update(data);
       YNQ.closeModal("modal-word-edit");
@@ -309,6 +293,7 @@ window.EditTab = (function () {
       try {
         await wordsRef().doc(wordId).update({
           level: 0,
+          correctStreak: 0,
           lastTestDate: firebase.firestore.FieldValue.delete(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
