@@ -47,7 +47,9 @@ const AVATAR_COLORS = ["#2a8cef", "#72ef2a", "#fa6c19", "#ff4e4d", "#a855f7", "#
 const HOWTO_CONTENT = [
   { title: "フォルダーを作る", body: "ホーム画面の「新規追加」から、単語帳をまとめるフォルダーを作成できます。" },
   { title: "単語帳を編集する", body: "フォルダーを開き、単語帳の「編集」タブから単語の追加・修正・削除ができます。" },
-  { title: "テストで暗記度を上げる", body: "「テスト」タブで出題範囲・出題形式(単語カード/4択/入力記述)などを設定して小テストを開始できます。Level採点をONにすると正誤に応じて暗記度(Level)が自動で変動します。" }
+  { title: "テストで暗記度を上げる", body: "「テスト」タブで出題範囲・出題形式(単語カード/4択/入力記述)などを設定して小テストを開始できます。Level採点をONにすると正誤に応じて暗記度(Level)が自動で変動します。" },
+  { title: "単語を編集する", body: "「編集」タブから単語の直接追加、CSV/Excelファイルからの一括インポート、単語ごとの修正・リセット・削除、範囲指定での一括操作ができます。" },
+  { title: "自分の記録を見る", body: "ヘッダーのアカウントアイコン→「プロフィール」から、全単語帳を合計した暗記度の状況や、直近のテスト実施記録を確認できます。" }
 ];
 // ▲▲ ここまでユーザー編集エリア ▲▲
 
@@ -55,6 +57,11 @@ const HOWTO_CONTENT = [
 // index 0 が最新版として常に開いた状態で表示され、それ以外は「過去のアップデート」に格納される。
 // ▼▼ ここから先はユーザーが自由に編集してよい(バージョン追加用コメント) ▼▼
 const PATCH_NOTES = [
+  {
+    version: "0.4.0",
+    date: "2026/09/11",
+    items: ["編集タブを追加(単語の追加/CSV・Excelインポート/修正/リセット/削除/一括操作)", "アカウントタブを追加(プロフィール・個人Level・テスト実施記録)"]
+  },
   {
     version: "0.3.0",
     date: "2026/09/11",
@@ -81,7 +88,7 @@ const PATCH_NOTES = [
    「今どのフォルダー/単語帳を開いているか」を参照できるようにする。
    ---------------------------------------------------------- */
 const YNQ = {
-  db, auth, LEVEL_COLORS,
+  db, auth, LEVEL_COLORS, AVATAR_COLORS,
   currentUser: null,   // ログイン中ユーザー(firebase.User)
   currentFolder: null, // 開いているフォルダー { id, name, color }
   currentBook: null,   // 開いている単語帳 { id, name, color, folderId }
@@ -458,7 +465,9 @@ async function loadAccountBadge(user) {
 const TAB_INIT_HOOKS = {
   home: () => window.FoldersTab && window.FoldersTab.init(),
   wordlist: () => window.WordlistTab && window.WordlistTab.init(),
-  test: () => window.TestTab && window.TestTab.init()
+  test: () => window.TestTab && window.TestTab.init(),
+  edit: () => window.EditTab && window.EditTab.init(),
+  account: () => window.AccountTab && window.AccountTab.init()
 };
 
 // タブの中身(tabs/*.html)を読み込んで #tab-content-area に差し込む
@@ -537,7 +546,7 @@ function setupHeaderInteractions() {
   document.getElementById("menu-logout").addEventListener("click", () => auth.signOut());
   document.getElementById("menu-profile").addEventListener("click", () => {
     closeAllPopovers();
-    showToast("プロフィール機能は準備中です");
+    loadTab("account");
   });
   document.getElementById("menu-bugreport").addEventListener("click", () => {
     closeAllPopovers();

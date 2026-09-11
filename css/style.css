@@ -885,6 +885,39 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
 .judge-incorrect { background: var(--color-danger); color: #fff; }
 
 /* ============================================================
+   7.8 編集タブ(tabs/edit.html / js/edit.js)
+   ============================================================ */
+#import-file-input {
+  padding: 10px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  width: 100%;
+  max-width: 420px;
+}
+
+/* ============================================================
+   7.9 アカウントタブ(tabs/account.html / js/account.js)
+   ============================================================ */
+.account-profile { display: flex; align-items: center; gap: 20px; }
+.account-profile-avatar {
+  width: 64px;
+  height: 64px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 26px;
+  font-weight: 800;
+  font-family: var(--font-en);
+}
+.account-profile-info h2 { margin: 0 0 4px; font-size: 18px; }
+.account-profile-info p { margin: 0; font-size: 13px; color: var(--color-text-muted); }
+
+/* ============================================================
    8. メディアクエリ(レスポンシブ)
    ブレークポイント方針:
    - 1200px以上: デスクトップ(PC)

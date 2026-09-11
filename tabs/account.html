@@ -1,0 +1,37 @@
+<!-- ============================================================
+     tabs/account.html
+     「アカウント」タブの中身(ユーザー情報・個人Level・テスト実施記録)
+     実際の描画・データ取得は js/account.js(AccountTab.init)が行う。
+     PC版ではタブバーに表示されず、ヘッダーのアカウントメニュー「プロフィール」から
+     この画面(loadTab('account'))に遷移する。
+     ============================================================ -->
+<div id="account-tab-root">
+
+  <section class="panel account-profile">
+    <div class="account-profile-avatar" id="account-avatar-large">?</div>
+    <div class="account-profile-info">
+      <h2 id="account-username">-</h2>
+      <p id="account-email"></p>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel-title"><i class="fa-solid fa-chart-simple"></i> 個人Level <small style="font-weight:400;color:var(--color-text-muted);">(全フォルダー・全単語帳の合計)</small></h2>
+    <div class="analytics-bar" id="account-level-bar"></div>
+    <div class="analytics-legend" id="account-level-legend">
+      <div class="analytics-legend-item">読み込み中...</div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel-title"><i class="fa-solid fa-clock-rotate-left"></i> テスト実施記録 <span class="panel-title-count">(直近20件)</span></h2>
+    <div class="table-scroll">
+      <table class="word-table">
+        <thead><tr><th>日時</th><th>単語帳</th><th>形式</th><th>正答率</th></tr></thead>
+        <tbody id="account-test-history-body">
+          <tr><td colspan="4" style="text-align:center;color:var(--color-text-muted);padding:20px;">読み込み中...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
