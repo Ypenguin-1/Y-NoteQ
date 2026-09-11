@@ -303,9 +303,7 @@ window.WordlistTab = (function () {
     downloadBlob(blob, `${YNQ.currentBook.name}_単語一覧.csv`);
   }
 
-  /* ---------- PDFダウンロード ----------
-     jsPDFの標準フォントは日本語に対応していないため、
-     表をhtml2canvasで画像化してPDFに貼り付ける方式にしている。 */
+  /* ---------- PDFダウンロード ---------- */
   async function exportPdf() {
     if (displayedWords.length === 0) { YNQ.showToast("出力できる単語がありません"); return; }
     const btn = document.getElementById("btn-export-pdf");
@@ -313,35 +311,7 @@ window.WordlistTab = (function () {
     YNQ.showToast("PDFを作成しています...");
     try {
       const table = document.querySelector("#wordlist-content .table-scroll table");
-      const bgColor = getComputedStyle(document.body).getPropertyValue("--color-bg-card").trim() || "#ffffff";
-      const canvas = await html2canvas(table, { scale: 2, backgroundColor: bgColor });
-
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const margin = 10;
-      const imgWidth = pageWidth - margin * 2;
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      doc.setFontSize(12);
-      doc.text(`${YNQ.currentBook.name}  -  単語一覧`, margin, 10);
-
-      const imgData = canvas.toDataURL("image/png");
-      let heightLeft = imgHeight;
-      let position = 16; // 1ページ目はタイトル分だけ下げる
-
-      doc.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
-      heightLeft -= (pageHeight - position);
-
-      while (heightLeft > 0) {
-        position = heightLeft - imgHeight;
-        doc.addPage();
-        doc.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-      }
-
-      doc.save(`${YNQ.currentBook.name}_単語一覧.pdf`);
+      await YNQ.exportTableAsPdf(table, `${YNQ.currentBook.name}  -  単語一覧`, `${YNQ.currentBook.name}_単語一覧.pdf`);
     } catch (err) {
       console.error("[wordlist:exportPdf]", err);
       YNQ.showToast("PDFの作成に失敗しました");

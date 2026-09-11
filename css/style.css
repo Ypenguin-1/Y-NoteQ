@@ -17,6 +17,9 @@ button { font: inherit; cursor: pointer; }
 input, select, textarea { font: inherit; }
 a { color: inherit; text-decoration: none; }
 img { max-width: 100%; display: block; }
+/* display:flex/grid等を指定したクラスでも hidden 属性が確実に効くようにする
+   (例: .field{display:flex} と hidden 属性が競合すると、属性側が負けて表示されたままになるため) */
+[hidden] { display: none !important; }
 
 /* ---------- 2. カラーテーマ変数 ----------
    data-theme="light" / "dark" を <html> に付けて切り替える。
@@ -788,6 +791,100 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
 .level-picker-popover[hidden] { display: none; }
 
 /* ============================================================
+   7.7 テストタブ(tabs/test.html / js/test.js)
+   ============================================================ */
+.panel-title-count { font-size: 12px; font-weight: 600; color: var(--color-text-muted); margin-left: 4px; }
+
+.btn-toggle-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.btn-toggle {
+  padding: 9px 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+.btn-toggle.active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-primary-contrast); }
+
+.test-settings-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+
+/* ---- テスト実施画面 ---- */
+.test-run-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+.test-run-progress { flex: 1; min-width: 200px; }
+.test-run-progress > span { font-size: 13px; font-weight: 700; color: var(--color-text-muted); }
+.progress-bar { height: 8px; border-radius: 999px; background: var(--color-bg-elevated); margin-top: 6px; overflow: hidden; }
+.progress-bar-fill { height: 100%; background: var(--color-primary); transition: width .25s ease; }
+.test-run-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  font-size: 16px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  background: var(--color-bg-elevated);
+}
+.test-run-timer.timer-warning { color: var(--color-danger); }
+
+.test-question-card {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: 36px 24px;
+  text-align: center;
+  margin-bottom: 18px;
+}
+.test-question-meta { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 18px; color: var(--color-text-muted); font-size: 13px; font-weight: 700; }
+.test-question-prompt { font-size: 30px; font-weight: 800; margin-bottom: 30px; word-break: break-word; }
+
+.test-answer-area { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.test-flashcard-answer { font-size: 22px; font-weight: 700; color: var(--color-primary-dark); }
+.test-flashcard-judge { display: flex; gap: 12px; }
+
+.choice4-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 520px; margin: 0 auto; }
+.choice4-grid .btn { width: 100%; padding: 14px; font-size: 14px; }
+.choice4-grid .choice-dontknow { grid-column: 1 / -1; }
+.choice-btn.correct { background: var(--color-success); color: #fff; border-color: var(--color-success); }
+.choice-btn.incorrect { background: var(--color-danger); color: #fff; border-color: var(--color-danger); }
+
+#typed-answer-input {
+  width: 100%;
+  max-width: 360px;
+  padding: 14px 16px;
+  font-size: 18px;
+  text-align: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.test-feedback { margin-top: 22px; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.test-feedback-correct { color: var(--color-success); font-weight: 800; font-size: 18px; }
+.test-feedback-incorrect { color: var(--color-danger); font-weight: 800; font-size: 18px; }
+.test-feedback-answer { font-size: 13px; color: var(--color-text-muted); }
+
+.test-run-footer { display: flex; justify-content: center; }
+
+/* ---- 結果画面 ---- */
+.test-result-summary { text-align: center; }
+.test-result-score { font-size: 40px; font-weight: 800; color: var(--color-primary-dark); margin-bottom: 18px; }
+.test-result-score small { display: block; font-size: 14px; font-weight: 600; color: var(--color-text-muted); margin-top: 4px; }
+.test-result-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
+.judge-badge { padding: 3px 10px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; }
+.judge-correct { background: var(--color-success); color: #fff; }
+.judge-incorrect { background: var(--color-danger); color: #fff; }
+
+/* ============================================================
    8. メディアクエリ(レスポンシブ)
    ブレークポイント方針:
    - 1200px以上: デスクトップ(PC)
@@ -845,4 +942,8 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   .section-toolbar .btn { width: 100%; }
   .export-actions { flex-wrap: wrap; }
   .export-actions .btn { flex: 1; }
+
+  .choice4-grid { grid-template-columns: 1fr; }
+  .test-question-prompt { font-size: 24px; }
+  .test-settings-actions .btn { width: 100%; }
 }

@@ -47,7 +47,7 @@ const AVATAR_COLORS = ["#2a8cef", "#72ef2a", "#fa6c19", "#ff4e4d", "#a855f7", "#
 const HOWTO_CONTENT = [
   { title: "フォルダーを作る", body: "ホーム画面の「新規追加」から、単語帳をまとめるフォルダーを作成できます。" },
   { title: "単語帳を編集する", body: "フォルダーを開き、単語帳の「編集」タブから単語の追加・修正・削除ができます。" },
-  { title: "テストで暗記度を上げる", body: "「テスト」タブから小テストを開始すると、正誤に応じて暗記度(Level)が変動します。" }
+  { title: "テストで暗記度を上げる", body: "「テスト」タブで出題範囲・出題形式(単語カード/4択/入力記述)などを設定して小テストを開始できます。Level採点をONにすると正誤に応じて暗記度(Level)が自動で変動します。" }
 ];
 // ▲▲ ここまでユーザー編集エリア ▲▲
 
@@ -55,6 +55,11 @@ const HOWTO_CONTENT = [
 // index 0 が最新版として常に開いた状態で表示され、それ以外は「過去のアップデート」に格納される。
 // ▼▼ ここから先はユーザーが自由に編集してよい(バージョン追加用コメント) ▼▼
 const PATCH_NOTES = [
+  {
+    version: "0.3.0",
+    date: "2026/09/11",
+    items: ["テストタブを追加(単語カード/4択問題/入力記述、制限時間、Level採点、結果のPDF出力)"]
+  },
   {
     version: "0.2.0",
     date: "2026/09/11",
@@ -82,7 +87,7 @@ const YNQ = {
   currentBook: null,   // 開いている単語帳 { id, name, color, folderId }
   // 以下は関数定義後(このファイルの後半)に中身が確定するが、
   // function宣言はホイスティングされるためここで参照しても問題ない
-  showToast, openModal, closeModal, confirmDialog, escapeHtml,
+  showToast, openModal, closeModal, confirmDialog, escapeHtml, exportTableAsPdf,
   pad4: (n) => String(n).padStart(4, "0"),
   hashString
 };
@@ -116,6 +121,40 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str == null ? "" : String(str);
   return div.innerHTML;
+}
+
+// 表(テーブル要素)をPDFとして書き出す共通処理(単語一覧・テストの各タブから利用)。
+// jsPDFの標準フォントは日本語非対応のため、html2canvasで表を画像化してPDFに貼り付ける方式にしている。
+async function exportTableAsPdf(tableEl, title, filename) {
+  const bgColor = getComputedStyle(document.body).getPropertyValue("--color-bg-card").trim() || "#ffffff";
+  const canvas = await html2canvas(tableEl, { scale: 2, backgroundColor: bgColor });
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const margin = 10;
+  const imgWidth = pageWidth - margin * 2;
+  const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+  doc.setFontSize(12);
+  doc.text(title, margin, 10);
+
+  const imgData = canvas.toDataURL("image/png");
+  let heightLeft = imgHeight;
+  let position = 16; // 1ページ目はタイトル分だけ下げる
+
+  doc.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+  heightLeft -= (pageHeight - position);
+
+  while (heightLeft > 0) {
+    position = heightLeft - imgHeight;
+    doc.addPage();
+    doc.addImage(imgData, "PNG", margin, position, imgWidth, imgHeight);
+    heightLeft -= pageHeight;
+  }
+
+  doc.save(filename);
 }
 
 // 文字列から安定したハッシュ値を作る(アイコン色の自動割当に使用)
@@ -418,7 +457,8 @@ async function loadAccountBadge(user) {
 // 各タブのロジックは js/folders.js・js/wordlist.js 側で定義し、ここから呼び出す。
 const TAB_INIT_HOOKS = {
   home: () => window.FoldersTab && window.FoldersTab.init(),
-  wordlist: () => window.WordlistTab && window.WordlistTab.init()
+  wordlist: () => window.WordlistTab && window.WordlistTab.init(),
+  test: () => window.TestTab && window.TestTab.init()
 };
 
 // タブの中身(tabs/*.html)を読み込んで #tab-content-area に差し込む

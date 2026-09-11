@@ -1,0 +1,206 @@
+<!-- ============================================================
+     tabs/test.html
+     「テスト」タブの中身(①設定画面 → ②実施画面 → ③結果画面)
+     実際の描画・データ取得は js/test.js(TestTab.init)が行う。
+     ============================================================ -->
+<div id="test-tab-root">
+
+  <!-- 単語帳が開かれていない場合 -->
+  <div id="test-empty" class="placeholder-card" hidden>
+    <i class="fa-solid fa-book-open"></i>
+    <p>単語帳が選択されていません。<br>「フォルダー」タブから単語帳を開いてください。</p>
+    <button type="button" class="btn btn-primary" id="btn-test-goto-folders" style="margin-top:16px;">フォルダーへ移動</button>
+  </div>
+
+  <!-- ============================================================
+       ① テスト設定画面
+       ============================================================ -->
+  <div id="test-screen-settings" hidden>
+    <section class="panel">
+      <h2 class="panel-title"><i class="fa-solid fa-sliders"></i> テスト設定</h2>
+
+      <div class="field">
+        <label for="test-set-no">出題範囲 / 特定No.指定 <small>(例: 1-10 / 3,5,10 / 空欄で全範囲)</small></label>
+        <input type="text" id="test-set-no" placeholder="例: 1-10, 15">
+      </div>
+
+      <div class="field" style="max-width:140px;">
+        <label for="test-set-count">出題数</label>
+        <input type="number" id="test-set-count" min="1" value="10">
+      </div>
+
+      <div class="field">
+        <label>出題の向き</label>
+        <div class="btn-toggle-group" id="test-set-direction">
+          <button type="button" class="btn-toggle active" data-value="word2meaning">出題:単語 → 解答:意味</button>
+          <button type="button" class="btn-toggle" data-value="meaning2word">出題:意味 → 解答:単語</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>採点方式</label>
+        <div class="btn-toggle-group" id="test-set-scoring-timing">
+          <button type="button" class="btn-toggle active" data-value="each">毎時採点</button>
+          <button type="button" class="btn-toggle" data-value="end">最後に採点</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>出題対象Level(複数選択可・未選択ですべて対象)</label>
+        <div class="btn-toggle-group" id="test-set-levels">
+          <button type="button" class="btn-toggle" data-value="0">未</button>
+          <button type="button" class="btn-toggle" data-value="1">Level 1</button>
+          <button type="button" class="btn-toggle" data-value="2">Level 2</button>
+          <button type="button" class="btn-toggle" data-value="3">Level 3</button>
+          <button type="button" class="btn-toggle" data-value="4">Level 4</button>
+          <button type="button" class="btn-toggle" data-value="5">Level 5</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>出題形式</label>
+        <div class="btn-toggle-group" id="test-set-format">
+          <button type="button" class="btn-toggle active" data-value="flashcard">単語カード</button>
+          <button type="button" class="btn-toggle" data-value="choice4">4択問題</button>
+          <button type="button" class="btn-toggle" data-value="typed">入力記述</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Level表示</label>
+        <div class="btn-toggle-group" id="test-set-show-level">
+          <button type="button" class="btn-toggle active" data-value="on">ON</button>
+          <button type="button" class="btn-toggle" data-value="off">OFF</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>Level採点 <small>(正解/不正解に応じて暗記度を自動変動させる)</small></label>
+        <div class="btn-toggle-group" id="test-set-level-scoring">
+          <button type="button" class="btn-toggle active" data-value="on">ON</button>
+          <button type="button" class="btn-toggle" data-value="off">OFF</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label>制限時間の設定</label>
+        <div class="btn-toggle-group" id="test-set-timelimit-mode">
+          <button type="button" class="btn-toggle active" data-value="none">制限時間なし</button>
+          <button type="button" class="btn-toggle" data-value="perQuestion">1問ごとに設定</button>
+          <button type="button" class="btn-toggle" data-value="total">全問まとめて設定</button>
+        </div>
+        <div class="field" id="test-set-timelimit-seconds-wrap" hidden style="margin-top:10px;max-width:160px;">
+          <label for="test-set-timelimit-seconds">制限時間(秒)</label>
+          <input type="number" id="test-set-timelimit-seconds" min="5" value="30">
+        </div>
+      </div>
+
+      <div class="test-settings-actions">
+        <button type="button" class="btn btn-primary" id="btn-test-start"><i class="fa-solid fa-play"></i> 設定した条件でテスト開始</button>
+        <button type="button" class="btn btn-secondary" id="btn-test-export-pdf"><i class="fa-solid fa-file-pdf"></i> テストをPDFに出力</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title"><i class="fa-solid fa-list-check"></i> 対象の単語 <span class="panel-title-count" id="test-candidate-count"></span></h2>
+      <div class="table-scroll">
+        <table class="word-table">
+          <thead><tr><th>単語No.</th><th>単語</th><th>意味</th><th>暗記度</th></tr></thead>
+          <tbody id="test-candidate-body"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- ============================================================
+       ② テスト実施画面
+       ============================================================ -->
+  <div id="test-screen-running" hidden>
+    <div class="test-run-header">
+      <div class="test-run-progress">
+        <span id="test-run-progress-text">1 / 10問</span>
+        <div class="progress-bar"><div class="progress-bar-fill" id="test-run-progress-fill" style="width:0%;"></div></div>
+      </div>
+      <div class="test-run-timer" id="test-run-timer" hidden><i class="fa-solid fa-stopwatch"></i> <span id="test-run-timer-text">00:30</span></div>
+    </div>
+
+    <div class="test-question-card">
+      <div class="test-question-meta">
+        <span id="test-question-no"></span>
+        <span id="test-question-level" class="level-pill" hidden></span>
+      </div>
+      <div class="test-question-prompt" id="test-question-prompt"></div>
+
+      <!-- 単語カード -->
+      <div id="test-area-flashcard" class="test-answer-area" hidden>
+        <button type="button" class="btn btn-primary" id="btn-flashcard-reveal">答えを表示</button>
+        <div id="flashcard-answer" class="test-flashcard-answer" hidden></div>
+        <div class="test-flashcard-judge" id="flashcard-judge" hidden>
+          <button type="button" class="btn btn-danger" id="btn-flashcard-wrong"><i class="fa-solid fa-xmark"></i> 不正解</button>
+          <button type="button" class="btn" style="background:var(--color-success);color:#fff;" id="btn-flashcard-correct"><i class="fa-solid fa-check"></i> 正解</button>
+        </div>
+      </div>
+
+      <!-- 4択問題 -->
+      <div id="test-area-choice4" class="test-answer-area" hidden>
+        <div class="choice4-grid" id="choice4-grid"></div>
+      </div>
+
+      <!-- 入力記述 -->
+      <div id="test-area-typed" class="test-answer-area" hidden>
+        <input type="text" id="typed-answer-input" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="ここに解答を入力">
+        <button type="button" class="btn btn-primary" id="btn-typed-submit">解答する</button>
+      </div>
+
+      <!-- 毎時採点モードのフィードバック -->
+      <div class="test-feedback" id="test-feedback" hidden>
+        <div id="test-feedback-result"></div>
+        <div class="test-feedback-answer" id="test-feedback-answer"></div>
+        <button type="button" class="btn btn-primary" id="btn-test-next">次へ <i class="fa-solid fa-arrow-right"></i></button>
+      </div>
+    </div>
+
+    <div class="test-run-footer">
+      <button type="button" class="btn btn-secondary" id="btn-test-abort"><i class="fa-solid fa-circle-stop"></i> テストを中断</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       ③ 結果画面
+       ============================================================ -->
+  <div id="test-screen-result" hidden>
+    <section class="panel test-result-summary">
+      <h2 class="panel-title"><i class="fa-solid fa-trophy"></i> 結果</h2>
+      <div class="test-result-score" id="test-result-score"></div>
+      <div class="test-result-actions">
+        <button type="button" class="btn btn-primary" id="btn-result-retry">もう一度</button>
+        <button type="button" class="btn btn-secondary" id="btn-result-retry-wrong">間違えた・わからない問題のみ</button>
+        <button type="button" class="btn btn-secondary" id="btn-result-finish">終了</button>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2 class="panel-title"><i class="fa-solid fa-table-list"></i> 解答結果 <small style="font-weight:400;color:var(--color-text-muted);">(Levelは手動で変更できます)</small></h2>
+      <div class="table-scroll">
+        <table class="word-table">
+          <thead><tr><th>単語No.</th><th>問題</th><th>あなたの解答</th><th>正解</th><th>判定</th><th>Level推移</th></tr></thead>
+          <tbody id="test-result-body"></tbody>
+        </table>
+      </div>
+      <div class="export-actions">
+        <button type="button" class="btn btn-secondary" id="btn-result-export-pdf"><i class="fa-solid fa-file-pdf"></i> 結果をPDFに出力</button>
+      </div>
+    </section>
+  </div>
+</div>
+
+<!-- テスト中断の確認モーダル -->
+<div class="modal" id="modal-test-abort" hidden>
+  <div class="modal-box" style="max-width:360px;text-align:center;">
+    <p style="margin:10px 0 22px;font-size:14px;">テストを中断しますか?<br><strong>テスト内容が記録されません。</strong></p>
+    <div class="auth-step-nav">
+      <button type="button" class="btn btn-secondary" id="btn-abort-cancel">続ける</button>
+      <button type="button" class="btn btn-danger" id="btn-abort-ok">中断する</button>
+    </div>
+  </div>
+</div>
