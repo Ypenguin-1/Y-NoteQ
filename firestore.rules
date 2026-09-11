@@ -1,0 +1,37 @@
+// ============================================================
+// Y-NoteQ Firestore セキュリティルール(Phase 1: 認証・招待コード分)
+// Firebaseコンソール > Firestore Database > ルール に貼り付けて公開してください。
+// Phase 2以降(フォルダー/単語帳/共有)の追加時にルールも拡張していきます。
+// ============================================================
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ユーザープロフィール: 本人のみ読み書き可能
+    match /users/{uid} {
+      allow read:   if request.auth != null && request.auth.uid == uid;
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update: if request.auth != null && request.auth.uid == uid;
+      allow delete: if false;
+    }
+
+    // 招待コード
+    // ・get(1件取得)は未ログインでも許可(新規登録の最初のステップで照合するため)
+    // ・list(一覧取得)は禁止し、コードの総当たり列挙を防止
+    // ・使用済みにする更新は、サインアップ直後の本人(認証済み)のみ、
+    //   かつ「まだ使われていないコード」に対してのみ許可する
+    match /inviteCodes/{code} {
+      allow get: if true;
+      allow list: if false;
+      allow update: if request.auth != null
+                    && resource.data.used != true
+                    && request.resource.data.usedBy == request.auth.uid;
+      allow create, delete: if false; // コードの発行/削除は管理者がFirebaseコンソールから行う想定
+    }
+
+    // 上記以外は全て拒否(未設計のコレクションへの誤アクセスを防止)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

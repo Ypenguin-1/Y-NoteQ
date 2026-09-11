@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Y-NoteQ</title>
+
+<!-- Google Fonts: 日本語=Noto Sans JP / 英数字=Poppins(Futuraの代替) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<!-- Font Awesome(アイコンは絵文字を使わずこちらを使用) -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- ============================================================
+     ログイン画面
+     ============================================================ -->
+<section id="screen-login" class="screen">
+  <div class="screen-bg-blob blob-1"></div>
+  <div class="screen-bg-blob blob-2"></div>
+  <div class="screen-bg-blob blob-3"></div>
+
+  <div class="auth-card">
+    <div class="auth-logo">
+      <img src="assets/Y-pen_icon_Light.svg" alt="Y-NoteQ ロゴ" id="login-logo-img">
+      <span>Y-NoteQ</span>
+    </div>
+    <p class="auth-subtitle">単語の暗記度を、しっかり管理。</p>
+
+    <form id="form-login" novalidate>
+      <div class="field">
+        <label for="login-email">メールアドレス</label>
+        <input type="email" id="login-email" placeholder="you@example.com" autocomplete="email" required>
+        <div class="field-error" id="login-email-error"></div>
+      </div>
+      <div class="field">
+        <label for="login-password">パスワード</label>
+        <input type="password" id="login-password" placeholder="••••••••" autocomplete="current-password" required>
+        <div class="field-error" id="login-password-error"></div>
+      </div>
+
+      <div class="auth-actions">
+        <button type="submit" class="btn btn-primary btn-block" id="btn-login">
+          <i class="fa-solid fa-right-to-bracket"></i> ログイン
+        </button>
+      </div>
+    </form>
+
+    <div class="auth-switch">
+      アカウントをお持ちでないですか?
+      <button type="button" id="btn-go-register">新規登録</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     新規登録画面(①招待コード → ②メールアドレス → ③パスワード)
+     ※REQUIRE_INVITE_CODE を js/app.js で false にすると
+       ①の招待コードステップは自動的にスキップされます。
+     ============================================================ -->
+<section id="screen-register" class="screen" hidden>
+  <div class="screen-bg-blob blob-1"></div>
+  <div class="screen-bg-blob blob-2"></div>
+  <div class="screen-bg-blob blob-3"></div>
+
+  <div class="auth-card">
+    <div class="auth-logo">
+      <img src="assets/Y-pen_icon_Light.svg" alt="Y-NoteQ ロゴ">
+      <span>Y-NoteQ</span>
+    </div>
+    <p class="auth-subtitle">新規登録</p>
+
+    <div class="register-steps" id="register-steps">
+      <span class="step-dot" data-step="invite"></span>
+      <span class="step-dot" data-step="email"></span>
+      <span class="step-dot" data-step="password"></span>
+    </div>
+
+    <!-- ①招待コード入力(暫定機能。将来的に廃止しやすいよう独立ブロックにしてあります) -->
+    <div class="register-step" data-step="invite">
+      <div class="field">
+        <label for="reg-invite">招待コード(6桁の数字)</label>
+        <input type="text" id="reg-invite" inputmode="numeric" maxlength="6" placeholder="123456">
+        <div class="field-error" id="reg-invite-error"></div>
+      </div>
+      <div class="auth-step-nav">
+        <button type="button" class="btn btn-primary btn-block" id="btn-invite-next">次へ</button>
+      </div>
+    </div>
+
+    <!-- ②メールアドレス入力 -->
+    <div class="register-step" data-step="email">
+      <div class="field">
+        <label for="reg-email">メールアドレス</label>
+        <input type="email" id="reg-email" placeholder="you@example.com" autocomplete="email">
+        <div class="field-error" id="reg-email-error"></div>
+      </div>
+      <div class="auth-step-nav">
+        <button type="button" class="btn btn-secondary" id="btn-email-back">戻る</button>
+        <button type="button" class="btn btn-primary" id="btn-email-next">次へ</button>
+      </div>
+    </div>
+
+    <!-- ③パスワード設定(2回入力し一致を確認) -->
+    <div class="register-step" data-step="password">
+      <div class="field">
+        <label for="reg-password">パスワード(8文字以上)</label>
+        <input type="password" id="reg-password" placeholder="••••••••" autocomplete="new-password">
+        <div class="field-error" id="reg-password-error"></div>
+      </div>
+      <div class="field">
+        <label for="reg-password2">パスワード(確認用)</label>
+        <input type="password" id="reg-password2" placeholder="••••••••" autocomplete="new-password">
+        <div class="field-error" id="reg-password2-error"></div>
+      </div>
+      <div class="auth-step-nav">
+        <button type="button" class="btn btn-secondary" id="btn-password-back">戻る</button>
+        <button type="button" class="btn btn-primary" id="btn-register-submit">登録する</button>
+      </div>
+    </div>
+
+    <div class="auth-switch">
+      すでにアカウントをお持ちですか?
+      <button type="button" id="btn-go-login">ログインへ戻る</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============================================================
+     アプリ本体(ログイン後に表示)
+     ============================================================ -->
+<div id="app-shell" hidden>
+
+  <!-- ---------- ヘッダー ---------- -->
+  <header id="app-header">
+    <div class="header-left">
+      <button type="button" class="header-brand" id="btn-logo-home" title="ホームに戻る">
+        <img src="assets/Y-pen_icon_Light.svg" alt="" id="header-logo-img">
+        <span>Y-NoteQ</span>
+      </button>
+      <button type="button" class="btn-icon header-back" id="btn-back" title="1つ前に戻る">
+        <i class="fa-solid fa-arrow-left"></i>
+      </button>
+      <!-- 単語帳を開いている時だけ単語帳名を表示(Phase2以降でJSから文言を設定) -->
+      <span class="header-booktitle" id="header-booktitle" hidden></span>
+    </div>
+
+    <div class="header-right">
+      <button type="button" class="header-nav-link" id="btn-open-howto">使い方</button>
+      <button type="button" class="header-nav-link" id="btn-open-patchnotes">パッチノート</button>
+
+      <button type="button" class="btn-icon" id="btn-theme-toggle" title="ライト/ダークモード切替">
+        <i class="fa-solid fa-circle-half-stroke"></i>
+      </button>
+
+      <!-- 音量調整(発音読み上げ / 効果音) -->
+      <div class="popover-wrap">
+        <button type="button" class="btn-icon" id="btn-volume" title="音量調整">
+          <i class="fa-solid fa-volume-high"></i>
+        </button>
+        <div class="popover" id="popover-volume" hidden>
+          <div class="volume-row">
+            <label for="vol-tts"><i class="fa-solid fa-comment-dots"></i> 発音読み上げ</label>
+            <input type="range" id="vol-tts" min="0" max="100" value="80">
+          </div>
+          <div class="volume-row">
+            <label for="vol-se"><i class="fa-solid fa-bell"></i> 効果音</label>
+            <input type="range" id="vol-se" min="0" max="100" value="60">
+          </div>
+        </div>
+      </div>
+
+      <!-- アカウントメニュー -->
+      <div class="popover-wrap">
+        <button type="button" class="account-avatar" id="btn-account" title="アカウント"></button>
+        <div class="popover account-menu" id="popover-account" hidden>
+          <button type="button" class="account-menu-item" id="menu-profile"><i class="fa-solid fa-id-card"></i> プロフィール</button>
+          <button type="button" class="account-menu-item" id="menu-bugreport"><i class="fa-solid fa-bug"></i> バグを報告</button>
+          <div class="account-menu-divider"></div>
+          <button type="button" class="account-menu-item danger" id="menu-logout"><i class="fa-solid fa-right-from-bracket"></i> ログアウト</button>
+        </div>
+      </div>
+
+      <!-- モバイル用ハンバーガー -->
+      <button type="button" class="btn-icon header-hamburger" id="btn-hamburger" title="メニュー">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- モバイル用オフキャンバスメニュー -->
+  <div class="mobile-menu" id="mobile-menu" hidden>
+    <div class="mobile-menu-panel">
+      <button type="button" class="btn-icon mobile-menu-close" id="btn-mobile-menu-close"><i class="fa-solid fa-xmark"></i></button>
+      <button type="button" class="header-nav-link" id="mbtn-howto">使い方</button>
+      <button type="button" class="header-nav-link" id="mbtn-patchnotes">パッチノート</button>
+      <button type="button" class="header-nav-link" id="mbtn-theme">ライト/ダークモード切替</button>
+      <button type="button" class="header-nav-link" id="mbtn-back">1つ前に戻る</button>
+    </div>
+  </div>
+
+  <!-- ---------- タブバー(Phase2以降で機能実装。今は骨格のみ) ---------- -->
+  <nav id="tab-bar" hidden>
+    <button class="tab-btn active" data-tab="home"><i class="fa-solid fa-folder"></i>フォルダー</button>
+    <button class="tab-btn" data-tab="wordlist"><i class="fa-solid fa-list"></i>単語一覧</button>
+    <button class="tab-btn" data-tab="test"><i class="fa-solid fa-pen-ruler"></i>テスト</button>
+    <button class="tab-btn" data-tab="edit"><i class="fa-solid fa-pen"></i>編集</button>
+    <button class="tab-btn" data-tab="share"><i class="fa-solid fa-share-nodes"></i>共有</button>
+    <button class="tab-btn tab-account-mobile" data-tab="account"><i class="fa-solid fa-user"></i>アカウント</button>
+  </nav>
+
+  <!-- ---------- メインコンテンツ(タブの中身を読み込む場所) ---------- -->
+  <main id="tab-content-area">
+    <div class="placeholder-card">
+      <i class="fa-solid fa-folder-tree"></i>
+      <p>ログインに成功しました。<br>フォルダー・単語帳画面は Phase 2 で実装予定です。</p>
+    </div>
+  </main>
+
+  <!-- ---------- フッター(暫定。詳細仕様は後日指示予定) ---------- -->
+  <footer id="app-footer">
+    <span>&copy; 2026 Y-NoteQ</span>
+  </footer>
+</div>
+
+<!-- ============================================================
+     モーダル: 使い方
+     ============================================================ -->
+<div class="modal" id="modal-howto" hidden>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-circle-question"></i> 使い方</h2>
+      <button type="button" class="btn-icon" id="btn-close-howto"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="howto-list"><!-- js/app.js の HOWTO_CONTENT から自動生成されます --></div>
+  </div>
+</div>
+
+<!-- ============================================================
+     モーダル: パッチノート
+     ============================================================ -->
+<div class="modal" id="modal-patchnotes" hidden>
+  <div class="modal-box">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-clock-rotate-left"></i> パッチノート</h2>
+      <button type="button" class="btn-icon" id="btn-close-patchnotes"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div id="patch-latest"><!-- 最新版: js/app.js の PATCH_NOTES[0] --></div>
+    <button type="button" class="patch-history-toggle" id="btn-toggle-history">
+      過去のアップデートを見る <i class="fa-solid fa-chevron-down"></i>
+    </button>
+    <div id="patch-history" class="patch-history" hidden><!-- 過去バージョン: js/app.js の PATCH_NOTES[1〜] --></div>
+  </div>
+</div>
+
+<!-- 削除確認など汎用の確認ダイアログ(Phase2以降で使用) -->
+<div class="modal" id="modal-confirm" hidden>
+  <div class="modal-box" style="max-width:360px;text-align:center;">
+    <p id="confirm-message" style="margin:10px 0 22px;font-size:14px;"></p>
+    <div class="auth-step-nav">
+      <button type="button" class="btn btn-secondary" id="btn-confirm-cancel">キャンセル</button>
+      <button type="button" class="btn btn-danger" id="btn-confirm-ok">削除する</button>
+    </div>
+  </div>
+</div>
+
+<!-- トースト通知 -->
+<div class="toast" id="toast" hidden></div>
+
+<!-- ============================================================
+     Firebase SDK(compatビルド。ビルドツールなしで<script>だけで使える版)
+     ============================================================ -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+
+<script src="js/app.js"></script>
+</body>
+</html>
