@@ -154,8 +154,23 @@ body {
   color: var(--color-text);
   border: none;
   font-size: 17px;
+  /* 仕様修正2026/09/12 No.2-7: display指定がないとアイコンが中央に来ない場合があるため明示する
+     (例: .header-hamburgerがinline-flexに切り替わった時、アイコンが左上に寄って見えていた) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .btn-icon:hover { background: var(--color-bg-elevated); }
+
+/* 仕様追加2026/09/12 No.1: 読み上げ(発音)ボタン。文中に自然に収まるよう小さめのinline-flexにする */
+.btn-speak {
+  width: 26px;
+  height: 26px;
+  font-size: 11px;
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--color-primary-dark);
+}
 
 .field {
   display: flex;
@@ -169,17 +184,17 @@ body {
   font-weight: 600;
   color: var(--color-text-muted);
 }
-.field input, .field textarea {
+.field input, .field textarea, .field select {
   padding: 12px 14px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  background: var(--color-bg-card);
   color: var(--color-text);
   outline: none;
   font-family: inherit;
 }
 .field textarea { resize: vertical; min-height: 64px; }
-.field input:focus, .field textarea:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(242, 207, 0, .25); }
+.field input:focus, .field textarea:focus, .field select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(242, 207, 0, .25); }
 .field-error {
   font-size: 12px;
   color: var(--color-danger);
@@ -396,10 +411,26 @@ body {
   font-weight: 700;
   font-size: 14px;
   font-family: var(--font-en);
+  white-space: nowrap;
   transition: filter .15s ease, transform .08s ease;
 }
 .account-avatar:hover { filter: brightness(0.92); }
 .account-avatar:active { transform: scale(0.96); }
+
+/* 仕様修正2026/09/12 No.2-1: 表示文字が2文字だと改行されてしまう不具合の修正、
+   および「4桁の通し番号(上段)+2文字(下段)」の2段表示への対応。 */
+.account-avatar.avatar-twoline, .account-profile-avatar.avatar-twoline {
+  flex-direction: column;
+  gap: 0;
+}
+.account-avatar .avatar-line, .account-profile-avatar .avatar-line {
+  line-height: 1.15;
+  white-space: nowrap;
+}
+.account-avatar.avatar-twoline .avatar-line:first-child { font-size: 9px; font-weight: 600; opacity: .85; }
+.account-avatar.avatar-twoline .avatar-line:last-child { font-size: 11px; }
+.account-profile-avatar.avatar-twoline .avatar-line:first-child { font-size: 15px; font-weight: 600; opacity: .85; }
+.account-profile-avatar.avatar-twoline .avatar-line:last-child { font-size: 18px; }
 .account-menu {
   width: 200px;
   padding: 8px;
@@ -462,6 +493,7 @@ body {
 }
 #tab-bar[hidden] { display: none; }
 .tab-btn {
+  position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -475,7 +507,17 @@ body {
   transition: background-color .15s ease, color .15s ease;
 }
 .tab-btn:hover { background: var(--color-bg-elevated); color: var(--color-text); }
-.tab-btn.active { color: var(--color-primary-dark); }
+/* 仕様修正2026/09/12 No.2-3: hover背景だけだとactiveタブと見分けづらいため、
+   activeタブには色に加えて背景の常時タブ・上部インジケーターバーを付けて明確にする */
+.tab-btn.active { color: var(--color-primary-dark); background: rgba(242, 207, 0, .12); }
+.tab-btn.active::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 22%; right: 22%;
+  height: 3px;
+  border-radius: 0 0 4px 4px;
+  background: var(--color-primary);
+}
 .tab-btn i { font-size: 16px; }
 
 /* ---- メインコンテンツ ---- */
@@ -652,7 +694,7 @@ body {
 .item-card-icon { font-size: 24px; flex-shrink: 0; margin-bottom: 6px; }
 .item-card-name {
   font-weight: 700;
-  font-size: 13px;
+  font-size: 15px;
   width: 100%;
   flex-shrink: 0;
   display: -webkit-box;
@@ -719,7 +761,7 @@ body {
   padding: 2px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  background: var(--color-bg);
+  background: var(--color-bg-card);
   cursor: pointer;
 }
 
@@ -782,7 +824,7 @@ body {
   padding: 8px 10px;
   border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  background: var(--color-bg-card);
   color: var(--color-text);
   text-align: center;
 }
@@ -817,6 +859,8 @@ body {
   border-radius: var(--radius-sm);
   background: var(--color-bg-elevated);
 }
+/* 仕様修正2026/09/12 No.2-6: 「NN% | M単語」を改行して2行表示にする */
+.analytics-legend-text { line-height: 1.5; }
 .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
 
 .filter-grid {
@@ -855,6 +899,11 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   font-size: 11px;
   font-weight: 700;
 }
+
+/* 仕様追加2026/09/12 No.3: 実施日セル内の「初見日/更新日」2行表示 */
+.date-cell { display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.date-cell-row { display: flex; gap: 6px; align-items: baseline; }
+.date-cell-label { font-size: 10px; font-weight: 700; color: var(--color-text-muted); flex-shrink: 0; }
 .level-pill {
   display: inline-flex;
   align-items: center;
@@ -898,12 +947,15 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   padding: 9px 16px;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  background: var(--color-bg-card);
   color: var(--color-text);
   font-size: 13px;
   font-weight: 600;
   transition: background-color .15s ease, filter .15s ease;
 }
+/* 仕様修正2026/09/12 No.2-3: 前回セッションでhover用ルールを追加した際に、選択中(active)を
+   黄色で塗る本体のルールを誤って消してしまっていたのを復元(「選択状態がわからない」の真因)。 */
+.btn-toggle.active { background: var(--color-primary); border-color: var(--color-primary); color: var(--color-primary-contrast); }
 .btn-toggle:hover:not(.active) { background: var(--color-bg-elevated); }
 .btn-toggle.active:hover { filter: brightness(0.96); }
 
@@ -943,7 +995,9 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   margin-bottom: 18px;
 }
 .test-question-meta { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 18px; color: var(--color-text-muted); font-size: 13px; font-weight: 700; }
-.test-question-prompt { font-size: 30px; font-weight: 800; margin-bottom: 30px; word-break: break-word; }
+/* 仕様追加2026/09/12 No.1: 問題文の読み上げボタン(発音マーク)を横に並べる */
+.test-question-prompt-row { display: flex; align-items: center; justify-content: center; gap: 10px; margin-bottom: 30px; }
+.test-question-prompt { font-size: 30px; font-weight: 800; word-break: break-word; }
 
 .test-answer-area { display: flex; flex-direction: column; align-items: center; gap: 16px; }
 .test-flashcard-answer { font-size: 22px; font-weight: 700; color: var(--color-primary-dark); }
@@ -963,7 +1017,7 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   text-align: center;
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
-  background: var(--color-bg);
+  background: var(--color-bg-card);
   color: var(--color-text);
 }
 
@@ -991,7 +1045,7 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   padding: 10px;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-bg);
+  background: var(--color-bg-card);
   color: var(--color-text);
   width: 100%;
   max-width: 420px;
@@ -1013,6 +1067,7 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   font-size: 26px;
   font-weight: 800;
   font-family: var(--font-en);
+  white-space: nowrap;
 }
 .account-profile-info p { margin: 4px 0 0; font-size: 13px; color: var(--color-text-muted); }
 .account-username-row { display: flex; align-items: center; gap: 6px; }
@@ -1028,7 +1083,7 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
 }
 .account-username-input:hover, .account-username-input:focus {
   border-color: var(--color-border);
-  background: var(--color-bg);
+  background: var(--color-bg-card);
   outline: none;
 }
 
@@ -1041,6 +1096,43 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   font-weight: 700;
   font-size: 16px;
 }
+.account-avatar-number-input {
+  width: 76px;
+  text-align: center;
+  font-weight: 700;
+  font-size: 16px;
+  font-family: var(--font-en);
+}
+
+/* ============================================================
+   7.10 共有タブ(tabs/share.html / js/share.js)仕様追加2026/09/12 No.4
+   ============================================================ */
+.shared-card { aspect-ratio: auto; padding: 16px; }
+.shared-card-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }
+.shared-card .item-card-name { font-size: 15px; -webkit-line-clamp: 1; }
+.shared-card .item-card-desc { -webkit-line-clamp: 2; margin: 6px 0; }
+.badge-official {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.shared-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  margin-bottom: 12px;
+}
+.shared-card-meta span { display: flex; align-items: center; gap: 4px; }
 
 /* ============================================================
    8. メディアクエリ(レスポンシブ)
@@ -1072,10 +1164,8 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   .header-booktitle { display: none; } /* 幅が狭い時は単語帳名を省略 */
 }
 
-/* 「アカウント」タブはPC以外(タブレット・スマホ)のみ表示(仕様#36) */
-@media (min-width: 768px) {
-  .tab-account-mobile { display: none; }
-}
+/* 仕様修正2026/09/12 No.2-2: 「アカウント」タブはPC版でもスマホ版と同様にタブバーへ常時表示する
+   (旧仕様#36で入れていたPC非表示の指定を廃止)。 */
 
 /* フォルダー/単語一覧タブ: スマホでは余白と配置を詰める */
 @media (max-width: 600px) {
@@ -1113,17 +1203,19 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
     padding: 4px 12px;
     background: var(--color-bg-card);
   }
+  /* 仕様修正2026/09/12 No.2-8: 値(単語・意味等)が右寄りになっていたため、
+     ラベルを上段・値を下段に積む左寄せレイアウトに変更する */
   .wordlist-table-scroll table.word-table td {
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
     border-bottom: 1px solid var(--color-border);
     padding: 10px 0;
     max-width: none;
     white-space: normal;
     word-break: break-word;
-    text-align: right;
+    text-align: left;
   }
   .wordlist-table-scroll table.word-table td:last-child { border-bottom: none; }
   .wordlist-table-scroll table.word-table td::before {
@@ -1134,5 +1226,5 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
     flex-shrink: 0;
     text-align: left;
   }
-  .wordlist-table-scroll table.word-table td .row-actions { justify-content: flex-end; flex-wrap: wrap; }
+  .wordlist-table-scroll table.word-table td .row-actions { justify-content: flex-start; flex-wrap: wrap; }
 }

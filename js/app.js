@@ -111,7 +111,7 @@ const YNQ = {
   // 以下は関数定義後(このファイルの後半)に中身が確定するが、
   // function宣言はホイスティングされるためここで参照しても問題ない
   showToast, openModal, closeModal, confirmDialog, escapeHtml, exportTableAsPdf,
-  bindLevelToggleGroup, setLevelToggleValue,
+  bindLevelToggleGroup, setLevelToggleValue, buildTestDateFields,
   pad4: (n) => String(n).padStart(4, "0"),
   hashString
 };
@@ -145,6 +145,77 @@ function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str == null ? "" : String(str);
   return div.innerHTML;
+}
+
+// 発音読み上げ(Web Speech API)。仕様追加2026/09/12 No.1:「単語一覧」「テスト」から共通で呼び出す。
+// ヘッダーの音量ポップオーバーにある #vol-tts(0〜100)を音量(0〜1)に変換して使用する。
+function speakText(text, lang) {
+  if (!text) return;
+  if (!("speechSynthesis" in window)) { showToast("この端末は読み上げに対応していません"); return; }
+  const volSlider = document.getElementById("vol-tts");
+  const volume = volSlider ? Number(volSlider.value) / 100 : 0.8;
+  if (volume <= 0) { showToast("読み上げの音量が0になっています"); return; }
+  window.speechSynthesis.cancel(); // 前の発話が残っていれば止めてから読み直す
+  const utter = new SpeechSynthesisUtterance(text);
+  utter.volume = volume;
+  if (lang) utter.lang = lang;
+  window.speechSynthesis.speak(utter);
+}
+YNQ.speakText = speakText;
+
+/* ----------------------------------------------------------
+   1.5 効果音(Web Audio APIで合成。音声ファイル不要)
+   仕様追加2026/09/12 No.2:「テスト」の正解/不正解/結果画面遷移で使用する。
+   ヘッダーの音量ポップオーバーにある #vol-se(0〜100)を音量(0〜1)に変換して使用する。
+   ---------------------------------------------------------- */
+let sfxAudioCtx = null;
+function getSfxAudioContext() {
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) return null;
+  if (!sfxAudioCtx) sfxAudioCtx = new Ctx();
+  if (sfxAudioCtx.state === "suspended") sfxAudioCtx.resume();
+  return sfxAudioCtx;
+}
+
+// freqList を順番に短く鳴らす(単音〜数音の簡単なメロディ)
+function playTone(freqList, { duration = 0.15, gap = 0.02, type = "sine" } = {}) {
+  const volSlider = document.getElementById("vol-se");
+  const volume = volSlider ? Number(volSlider.value) / 100 : 0.6;
+  if (volume <= 0) return;
+  const ctx = getSfxAudioContext();
+  if (!ctx) return;
+  let startTime = ctx.currentTime;
+  freqList.forEach((freq) => {
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gainNode.gain.setValueAtTime(0, startTime);
+    gainNode.gain.linearRampToValueAtTime(volume * 0.3, startTime + 0.01);
+    gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+    osc.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    osc.start(startTime);
+    osc.stop(startTime + duration + 0.02);
+    startTime += duration + gap;
+  });
+}
+
+function playCorrectSound() { playTone([880, 1318.51], { duration: 0.11, gap: 0.015 }); }
+function playIncorrectSound() { playTone([220, 164.81], { duration: 0.18, type: "sawtooth" }); }
+function playResultSound() { playTone([523.25, 659.25, 783.99, 1046.5], { duration: 0.13, gap: 0.02 }); }
+YNQ.playCorrectSound = playCorrectSound;
+YNQ.playIncorrectSound = playIncorrectSound;
+YNQ.playResultSound = playResultSound;
+
+// 単語を「実施(テストや手動でLevel変更)」した際に書き込む日付フィールドを組み立てる(仕様追加2026/09/12 No.3)。
+// ・更新日(lastTestDate) は毎回、今日の日付で更新する。
+// ・初見日(firstSeenDate) は初めて触れた時だけ記録し、既に値があればそれを維持する(変更しない)。
+function buildTestDateFields(existingFirstSeenDate, today) {
+  return {
+    lastTestDate: today,
+    firstSeenDate: existingFirstSeenDate || today
+  };
 }
 
 // 表(テーブル要素)をPDFとして書き出す共通処理(単語一覧・テストの各タブから利用)。
@@ -505,27 +576,46 @@ async function handleLogin(e) {
    7. アプリ本体(ヘッダー等)のセットアップ
    ---------------------------------------------------------- */
 
+// アイコンの表示内容を組み立てて要素に反映する共通処理(仕様修正2026/09/12 No.2-1)。
+// ・avatarNumberが4桁の数字の場合: 上段に番号、下段に表示文字(将来の団体管理用の通し番号+個人名)。
+// ・それ以外: 表示文字(最大2文字・数字可)のみを1行で表示し、未設定ならユーザーネームの頭文字にフォールバックする。
+// 表示文字は横書きのまま改行されないよう、呼び出し側のCSS(.avatar-twoline / white-space:nowrap)と対になっている。
+function renderAvatarContent(el, { number, text, username } = {}) {
+  const hasNumber = /^\d{4}$/.test(number || "");
+  const line = text || (username && username[0] ? username[0].toUpperCase() : "?");
+  if (hasNumber) {
+    el.classList.add("avatar-twoline");
+    el.innerHTML = `<span class="avatar-line">${escapeHtml(number)}</span><span class="avatar-line">${escapeHtml(line)}</span>`;
+  } else {
+    el.classList.remove("avatar-twoline");
+    el.textContent = line;
+  }
+}
+YNQ.renderAvatarContent = renderAvatarContent;
+
 // ログイン中ユーザーの情報をヘッダーのアカウントアイコンに反映する
-// 仕様修正2026/09/12 No.5: 表示文字はユーザーが指定した avatarText(最大2文字)を優先し、
+// 仕様修正2026/09/12 No.5: 表示文字はユーザーが指定した avatarText(最大2文字・数字可)を優先し、
 // 未設定の場合のみユーザーネームの頭文字にフォールバックする。
 async function loadAccountBadge(user) {
   const badge = document.getElementById("btn-account");
-  let text = user.email ? user.email[0].toUpperCase() : "?";
+  let username = user.email ? user.email.split("@")[0] : "";
+  let text = "", number = "";
   let color = AVATAR_COLORS[hashString(user.uid) % AVATAR_COLORS.length];
 
   try {
     const doc = await db.collection("users").doc(user.uid).get();
     if (doc.exists) {
       const data = doc.data();
-      if (data.username) text = data.username[0].toUpperCase();
+      if (data.username) username = data.username;
       if (data.avatarColor) color = data.avatarColor;
       if (data.avatarText) text = data.avatarText.toUpperCase();
+      if (data.avatarNumber) number = data.avatarNumber;
     }
   } catch (err) {
     console.error("[loadAccountBadge]", err);
   }
 
-  badge.textContent = text;
+  renderAvatarContent(badge, { number, text, username });
   badge.style.background = color;
 }
 // アカウントタブでプロフィールを保存した直後、ヘッダーのアイコンにも即座に反映するための公開関数
@@ -539,6 +629,7 @@ const TAB_INIT_HOOKS = {
   wordlist: () => window.WordlistTab && window.WordlistTab.init(),
   test: () => window.TestTab && window.TestTab.init(),
   edit: () => window.EditTab && window.EditTab.init(),
+  share: () => window.ShareTab && window.ShareTab.init(),
   account: () => window.AccountTab && window.AccountTab.init()
 };
 
@@ -679,6 +770,11 @@ function setupHeaderInteractions() {
   document.getElementById("menu-bugreport").addEventListener("click", () => {
     closeAllPopovers();
     showToast("バグ報告機能は準備中です");
+  });
+  // 仕様追加2026/09/12 No.5: 「サポートする」メニュー項目(機能は後日追加予定)
+  document.getElementById("menu-support").addEventListener("click", () => {
+    closeAllPopovers();
+    showToast("サポート機能は準備中です");
   });
 
   // ポップオーバーの外側クリックで閉じる

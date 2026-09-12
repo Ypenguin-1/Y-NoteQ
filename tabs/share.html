@@ -1,0 +1,35 @@
+<!-- ============================================================
+     tabs/share.html
+     「共有」タブの中身(自分の単語帳の共有・共有されている単語帳のインストール)
+     実際の描画・データ取得は js/share.js(ShareTab.init)が行う。
+     仕様追加2026/09/12 No.4
+     ============================================================ -->
+<div id="share-tab-root">
+
+  <section class="panel">
+    <h2 class="panel-title"><i class="fa-solid fa-upload"></i> 単語帳を共有する</h2>
+    <div class="filter-grid">
+      <div class="field">
+        <label for="share-source-select">共有する単語帳</label>
+        <select id="share-source-select"><option value="">読み込み中...</option></select>
+      </div>
+      <div class="field">
+        <label for="share-desc-input">説明(任意)</label>
+        <input type="text" id="share-desc-input" maxlength="200" placeholder="どんな単語帳か説明を書けます">
+      </div>
+    </div>
+    <p style="font-size:12px;color:var(--color-text-muted);margin:0 0 14px;">
+      単語・意味のみが共有されます(暗記度やテスト記録などの個人の学習状況は共有されません)。
+    </p>
+    <div class="test-settings-actions">
+      <button type="button" class="btn btn-primary" id="btn-share-publish"><i class="fa-solid fa-share-nodes"></i> 共有する</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2 class="panel-title"><i class="fa-solid fa-globe"></i> 共有されている単語帳</h2>
+    <div class="card-grid shared-grid" id="shared-list-grid">
+      <div class="placeholder-card"><i class="fa-solid fa-spinner fa-spin"></i><p>読み込み中...</p></div>
+    </div>
+  </section>
+</div>

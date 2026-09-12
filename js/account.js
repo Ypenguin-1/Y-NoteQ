@@ -10,7 +10,7 @@ window.AccountTab = (function () {
   // アイコン背景色の選択肢(仕様修正2026/09/12 No.5)
   const AVATAR_COLOR_SWATCHES = ["#2a8cef", "#72ef2a", "#fa6c19", "#ff4e4d", "#a855f7", "#0ea5e9", "#f97316", "#22c55e", "#F2CF00"];
   // 編集中のアイコン設定(保存ボタン押下時にまとめてFirestoreへ反映する)
-  let avatarState = { color: AVATAR_COLOR_SWATCHES[0], text: "" };
+  let avatarState = { color: AVATAR_COLOR_SWATCHES[0], text: "", number: "" };
   let currentUsername = "";
 
   function init() {
@@ -28,7 +28,14 @@ window.AccountTab = (function () {
 
     document.getElementById("btn-save-avatar").addEventListener("click", saveAvatar);
     document.getElementById("account-avatar-text-input").addEventListener("input", (e) => {
+      // 数字も入力できるようにする(仕様修正2026/09/12 No.2-1)。文字種の制限はせず先頭2文字までに丸める
       avatarState.text = e.target.value.toUpperCase().slice(0, 2);
+      updateAvatarPreview();
+    });
+    document.getElementById("account-avatar-number-input").addEventListener("input", (e) => {
+      // 団体管理用の通し番号(4桁の数字のみ)。数字以外は除去する
+      avatarState.number = e.target.value.replace(/[^0-9]/g, "").slice(0, 4);
+      e.target.value = avatarState.number;
       updateAvatarPreview();
     });
     document.getElementById("account-avatar-custom-color").addEventListener("input", (e) => {
@@ -46,6 +53,7 @@ window.AccountTab = (function () {
     let username = user.email ? user.email.split("@")[0] : "不明なユーザー";
     let color = YNQ.AVATAR_COLORS[YNQ.hashString(user.uid) % YNQ.AVATAR_COLORS.length];
     let avatarText = "";
+    let avatarNumber = "";
 
     try {
       const doc = await YNQ.db.collection("users").doc(user.uid).get();
@@ -54,6 +62,7 @@ window.AccountTab = (function () {
         if (data.username) username = data.username;
         if (data.avatarColor) color = data.avatarColor;
         if (data.avatarText) avatarText = data.avatarText;
+        if (data.avatarNumber) avatarNumber = data.avatarNumber;
       }
     } catch (err) {
       console.error("[account:loadProfile]", err);
@@ -62,8 +71,9 @@ window.AccountTab = (function () {
     currentUsername = username;
     document.getElementById("account-username-input").value = username;
 
-    avatarState = { color, text: avatarText };
+    avatarState = { color, text: avatarText, number: avatarNumber };
     document.getElementById("account-avatar-text-input").value = avatarText;
+    document.getElementById("account-avatar-number-input").value = avatarNumber;
     document.getElementById("account-avatar-custom-color").value = color;
     renderAvatarColorSwatches();
     updateAvatarPreview();
@@ -108,11 +118,11 @@ window.AccountTab = (function () {
     });
   }
 
-  // 表示文字が未設定の場合はユーザーネームの頭文字をプレビュー表示する(実際の保存値は空のまま)
+  // 表示文字が未設定の場合はユーザーネームの頭文字をプレビュー表示する(実際の保存値は空のまま)。
+  // 通し番号が4桁揃っている場合は「番号(上段)+表示文字(下段)」の2段表示にする(仕様修正2026/09/12 No.2-1)。
   function updateAvatarPreview() {
-    const displayText = avatarState.text || (currentUsername[0] ? currentUsername[0].toUpperCase() : "?");
     const avatarEl = document.getElementById("account-avatar-large");
-    avatarEl.textContent = displayText;
+    YNQ.renderAvatarContent(avatarEl, { number: avatarState.number, text: avatarState.text, username: currentUsername });
     avatarEl.style.background = avatarState.color;
   }
 
@@ -122,7 +132,8 @@ window.AccountTab = (function () {
     try {
       await YNQ.db.collection("users").doc(YNQ.currentUser.uid).set({
         avatarColor: avatarState.color,
-        avatarText: avatarState.text
+        avatarText: avatarState.text,
+        avatarNumber: avatarState.number
       }, { merge: true });
       YNQ.refreshAccountBadge();
       YNQ.showToast("アイコンを更新しました");
@@ -163,7 +174,7 @@ window.AccountTab = (function () {
         return `
           <div class="analytics-legend-item">
             <span class="legend-dot" style="background:${YNQ.LEVEL_COLORS[lv]}"></span>
-            Level${lv}: ${pct.toFixed(1)}% | ${counts[lv]}単語
+            <span class="analytics-legend-text">Level${lv}: ${pct.toFixed(1)}%<br>${counts[lv]}単語</span>
           </div>`;
       }).join("");
     } catch (err) {

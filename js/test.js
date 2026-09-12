@@ -124,7 +124,6 @@ window.TestTab = (function () {
 
     document.getElementById("test-set-no").addEventListener("input", updateCandidatePool);
     document.getElementById("btn-test-start").addEventListener("click", startTest);
-    document.getElementById("btn-test-export-pdf").addEventListener("click", exportSettingsPdf);
   }
 
   function readSettings() {
@@ -169,10 +168,9 @@ window.TestTab = (function () {
     }).join("");
   }
 
-  // 「問題+解答欄」だけの印刷用PDFを作る共通処理(仕様修正2026/09/12 No.6)。
-  // ・テスト開始前(設定画面): candidatePoolからその場でランダムに抽出した単語で出力する。
-  // ・テスト開始後(実施画面/結果画面): 実際にそのテストで出題された queue をそのまま使うことで、
-  //   「今受けている(受けた)テストと同じ内容」のPDFになるようにする。
+  // 「問題+解答欄」だけの印刷用PDFを作る共通処理(仕様修正2026/09/12 No.6, No.2-4)。
+  // テスト実施中(running画面)からのみ呼び出され、実際にそのテストで出題された queue を
+  // そのまま使うことで「今受けているテストと同じ内容」のPDFになるようにする。
   async function exportBlankTestPdf(pool, direction) {
     if (pool.length === 0) { YNQ.showToast("出力できる単語がありません"); return; }
     const promptField = direction === "word2meaning" ? "word" : "meaning";
@@ -206,14 +204,7 @@ window.TestTab = (function () {
     }
   }
 
-  // ①設定画面(テスト開始前): その場の条件でランダム抽出してPDF化
-  async function exportSettingsPdf() {
-    const s = readSettings();
-    const pool = shuffle(candidatePool.slice()).slice(0, Math.min(s.count, candidatePool.length));
-    await exportBlankTestPdf(pool, s.direction);
-  }
-
-  // ②③実施画面・結果画面(テスト開始後): 今回実際に出題された queue をそのままPDF化
+  // 実施画面(テスト中): 今回実際に出題された queue をそのままPDF化(仕様修正2026/09/12 No.2-4)
   async function exportCurrentTestPdf() {
     if (!settings || queue.length === 0) { YNQ.showToast("出力できるテストがありません"); return; }
     await exportBlankTestPdf(queue, settings.direction);
@@ -272,6 +263,13 @@ window.TestTab = (function () {
     document.getElementById("btn-test-next").addEventListener("click", goToNextQuestion);
 
     document.getElementById("btn-test-export-pdf-running").addEventListener("click", exportCurrentTestPdf);
+
+    // 仕様追加2026/09/12 No.1: 出題文の読み上げ(出題が単語なら英語、意味なら日本語として読む)
+    document.getElementById("btn-speak-question").addEventListener("click", () => {
+      const text = document.getElementById("test-question-prompt").textContent;
+      const lang = settings.direction === "word2meaning" ? "en-US" : "ja-JP";
+      YNQ.speakText(text, lang);
+    });
 
     document.getElementById("btn-test-abort").addEventListener("click", () => YNQ.openModal("modal-test-abort"));
     document.getElementById("btn-abort-cancel").addEventListener("click", () => YNQ.closeModal("modal-test-abort"));
@@ -394,6 +392,9 @@ window.TestTab = (function () {
     });
 
     if (settings.scoringTiming === "each") {
+      // 仕様追加2026/09/12 No.2: 毎時採点モードのみ、正解/不正解の効果音を鳴らす
+      // (最後に採点モードでは正誤を都度知らせないため、ここでは鳴らさない)
+      if (isCorrect) YNQ.playCorrectSound(); else YNQ.playIncorrectSound();
       showFeedback(isCorrect);
     } else {
       goToNextQuestion();
@@ -477,6 +478,7 @@ window.TestTab = (function () {
   async function finishTest() {
     stopTimer();
     showScreen("result");
+    YNQ.playResultSound(); // 仕様追加2026/09/12 No.2: 結果画面へ遷移した時に効果音を鳴らす
     await persistResults();
     renderResults();
   }
@@ -491,17 +493,20 @@ window.TestTab = (function () {
         // Levelが変わらなくても、次回1回正解でLevel downする「連続正解カウント」自体は
         // 毎回保存する必要があるため、回答したすべての単語を書き込み対象にする
         answers.forEach(a => {
+          const w = allWords.find(x => x.id === a.wordId);
+          // 初見日(初めて触れた日)は初回のみ記録し、以降の更新では変更しない(仕様追加2026/09/12 No.3)
+          const dateFields = YNQ.buildTestDateFields(w && w.firstSeenDate, today);
           batch.update(wordsRef().doc(a.wordId), {
             level: a.levelAfter,
             correctStreak: a.streakAfter || 0,
-            lastTestDate: today,
+            ...dateFields,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
         });
         await batch.commit();
         answers.forEach(a => {
           const w = allWords.find(x => x.id === a.wordId);
-          if (w) { w.level = a.levelAfter; w.correctStreak = a.streakAfter || 0; w.lastTestDate = today; }
+          if (w) { w.level = a.levelAfter; w.correctStreak = a.streakAfter || 0; w.lastTestDate = today; w.firstSeenDate = w.firstSeenDate || today; }
         });
       }
 
@@ -562,12 +567,14 @@ window.TestTab = (function () {
         a.levelAfter = lv;
         a.streakAfter = 0; // 手動修正のため、連続正解カウントはリセットする
         try {
+          const w = allWords.find(x => x.id === a.wordId);
+          // 初見日(初めて触れた日)は初回のみ記録し、以降の更新では変更しない(仕様追加2026/09/12 No.3)
+          const dateFields = YNQ.buildTestDateFields(w && w.firstSeenDate, todayFormatted());
           await wordsRef().doc(a.wordId).update({
-            level: lv, correctStreak: 0, lastTestDate: todayFormatted(),
+            level: lv, correctStreak: 0, ...dateFields,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
-          const w = allWords.find(x => x.id === a.wordId);
-          if (w) { w.level = lv; w.correctStreak = 0; w.lastTestDate = todayFormatted(); }
+          if (w) { w.level = lv; w.correctStreak = 0; w.lastTestDate = dateFields.lastTestDate; w.firstSeenDate = dateFields.firstSeenDate; }
           renderResults();
         } catch (err) {
           console.error("[test:openResultLevelPicker]", err);
@@ -591,7 +598,6 @@ window.TestTab = (function () {
       beginRun();
     });
     document.getElementById("btn-result-export-pdf").addEventListener("click", exportResultPdf);
-    document.getElementById("btn-result-export-blank-pdf").addEventListener("click", exportCurrentTestPdf);
 
     // ポップオーバーの外側クリックで閉じる(単語一覧タブ側と共通の要素のため、未登録でもここで保証する)
     document.addEventListener("click", (e) => {
