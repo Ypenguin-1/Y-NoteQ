@@ -279,7 +279,7 @@ window.FoldersTab = (function () {
         console.error("[folders:confirmDelete]", err);
         YNQ.showToast("削除に失敗しました");
       }
-    });
+    }, "削除する", true);
   }
 
   // 単語帳を削除する前に、中の単語をすべて削除する(Firestoreにサブコレクションの自動カスケード削除はないため)

@@ -1133,6 +1133,8 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
   margin-bottom: 12px;
 }
 .shared-card-meta span { display: flex; align-items: center; gap: 4px; }
+/* 仕様修正2026/09/12 No.3-3: 投稿者本人向けの「共有を中止」ボタンをインストールボタンの下に並べる */
+.shared-card-actions { display: flex; flex-direction: column; gap: 8px; }
 
 /* ============================================================
    8. メディアクエリ(レスポンシブ)

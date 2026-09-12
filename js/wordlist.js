@@ -194,8 +194,8 @@ window.WordlistTab = (function () {
       return `
         <tr data-id="${w.id}">
           <td data-label="単語No.">${YNQ.pad4(w.no)}</td>
-          <td class="col-word" data-label="単語">${YNQ.escapeHtml(w.word)} <button type="button" class="btn-icon btn-speak" data-action="speak" data-id="${w.id}" title="発音を聞く"><i class="fa-solid fa-volume-high"></i></button></td>
-          <td class="col-meaning" data-label="意味">${YNQ.escapeHtml(w.meaning)}</td>
+          <td class="col-word" data-label="単語"><button type="button" class="btn-icon btn-speak" data-action="speak" data-id="${w.id}" data-field="word" title="発音を聞く"><i class="fa-solid fa-volume-high"></i></button> ${YNQ.escapeHtml(w.word)}</td>
+          <td class="col-meaning" data-label="意味"><button type="button" class="btn-icon btn-speak" data-action="speak" data-id="${w.id}" data-field="meaning" title="読み上げ"><i class="fa-solid fa-volume-high"></i></button> ${YNQ.escapeHtml(w.meaning)}</td>
           <td data-label="実施日">${dateCell}</td>
           <td data-label="暗記度"><button type="button" class="level-pill" style="background:${YNQ.LEVEL_COLORS[level]}" data-action="level" data-id="${w.id}">${level}</button></td>
           <td data-label="操作">
@@ -210,11 +210,13 @@ window.WordlistTab = (function () {
     tbody.querySelectorAll('[data-action="level"]').forEach(btn => btn.addEventListener("click", (e) => openLevelPicker(e, btn.dataset.id)));
     tbody.querySelectorAll('[data-action="detail"]').forEach(btn => btn.addEventListener("click", () => openDetail(btn.dataset.id)));
     tbody.querySelectorAll('[data-action="reset"]').forEach(btn => btn.addEventListener("click", () => resetWord(btn.dataset.id)));
-    // 仕様追加2026/09/12 No.1: 単語の発音を読み上げる
+    // 仕様追加2026/09/12 No.1、仕様修正2026/09/12 No.3-1: 単語・意味どちらも読み上げできるようにする
     tbody.querySelectorAll('[data-action="speak"]').forEach(btn => btn.addEventListener("click", (e) => {
       e.stopPropagation();
       const w = allWords.find(x => x.id === btn.dataset.id);
-      if (w) YNQ.speakText(w.word, "en-US");
+      if (!w) return;
+      if (btn.dataset.field === "meaning") YNQ.speakText(w.meaning, "ja-JP");
+      else YNQ.speakText(w.word, "en-US");
     }));
   }
 
@@ -281,7 +283,7 @@ window.WordlistTab = (function () {
         console.error("[wordlist:resetWord]", err);
         YNQ.showToast("リセットに失敗しました");
       }
-    });
+    }, "リセットする", false);
   }
 
   function openDetail(wordId) {
