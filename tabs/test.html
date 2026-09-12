@@ -97,7 +97,6 @@
 
       <div class="test-settings-actions">
         <button type="button" class="btn btn-primary" id="btn-test-start"><i class="fa-solid fa-play"></i> 設定した条件でテスト開始</button>
-        <button type="button" class="btn btn-secondary" id="btn-test-export-pdf"><i class="fa-solid fa-file-pdf"></i> テストをPDFに出力</button>
       </div>
     </section>
 
@@ -129,7 +128,10 @@
         <span id="test-question-no"></span>
         <span id="test-question-level" class="level-pill" hidden></span>
       </div>
-      <div class="test-question-prompt" id="test-question-prompt"></div>
+      <div class="test-question-prompt-row">
+        <div class="test-question-prompt" id="test-question-prompt"></div>
+        <button type="button" class="btn-icon btn-speak" id="btn-speak-question" title="読み上げ"><i class="fa-solid fa-volume-high"></i></button>
+      </div>
 
       <!-- 単語カード -->
       <div id="test-area-flashcard" class="test-answer-area" hidden>
@@ -189,7 +191,6 @@
         </table>
       </div>
       <div class="export-actions">
-        <button type="button" class="btn btn-secondary" id="btn-result-export-blank-pdf"><i class="fa-solid fa-file-pdf"></i> このテストをPDFに出力(問題のみ)</button>
         <button type="button" class="btn btn-secondary" id="btn-result-export-pdf"><i class="fa-solid fa-file-pdf"></i> 結果をPDFに出力</button>
       </div>
     </section>

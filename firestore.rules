@@ -27,6 +27,24 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // 共有単語帳(sharedWordbooks/{id}, サブコレクション words) : 仕様追加2026/09/12 No.4
+    // ・読み取りはログイン済みユーザーなら誰でも可能(共有一覧の閲覧・インストール用)
+    // ・作成/更新/削除は投稿者本人のみ。official(公式)フラグはFirebaseコンソールから手動で付与する想定のため、
+    //   アプリ側からの書き込みで official を true にはできないようにする
+    match /sharedWordbooks/{sharedId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null
+                    && request.resource.data.authorUid == request.auth.uid
+                    && request.resource.data.official == false;
+      allow update, delete: if request.auth != null && resource.data.authorUid == request.auth.uid;
+
+      match /words/{wordId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null
+                     && get(/databases/$(database)/documents/sharedWordbooks/$(sharedId)).data.authorUid == request.auth.uid;
+      }
+    }
+
     // 招待コード
     // ・get(1件取得)は未ログインでも許可(新規登録の最初のステップで照合するため)
     // ・list(一覧取得)は禁止し、コードの総当たり列挙を防止

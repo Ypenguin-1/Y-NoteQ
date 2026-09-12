@@ -117,7 +117,7 @@ window.WordlistTab = (function () {
       return `
         <div class="analytics-legend-item">
           <span class="legend-dot" style="background:${YNQ.LEVEL_COLORS[lv]}"></span>
-          Level${lv}: ${pct.toFixed(1)}% | ${counts[lv]}単語
+          <span class="analytics-legend-text">Level${lv}: ${pct.toFixed(1)}%<br>${counts[lv]}単語</span>
         </div>`;
     }).join("");
   }
@@ -184,13 +184,17 @@ window.WordlistTab = (function () {
     }
     tbody.innerHTML = displayedWords.map(w => {
       const level = w.level || 0;
+      // 仕様追加2026/09/12 No.3: 実施日の列に「初見日(初めて触れた日)」を1行目、「更新日」を2行目として改行表示する
       const dateCell = level === 0
         ? `<span class="badge-notdone">未実施</span>`
-        : YNQ.escapeHtml(w.lastTestDate || "-");
+        : `<div class="date-cell">
+             <span class="date-cell-row"><span class="date-cell-label">初見日</span>${YNQ.escapeHtml(w.firstSeenDate || w.lastTestDate || "-")}</span>
+             <span class="date-cell-row"><span class="date-cell-label">更新日</span>${YNQ.escapeHtml(w.lastTestDate || "-")}</span>
+           </div>`;
       return `
         <tr data-id="${w.id}">
           <td data-label="単語No.">${YNQ.pad4(w.no)}</td>
-          <td class="col-word" data-label="単語">${YNQ.escapeHtml(w.word)}</td>
+          <td class="col-word" data-label="単語">${YNQ.escapeHtml(w.word)} <button type="button" class="btn-icon btn-speak" data-action="speak" data-id="${w.id}" title="発音を聞く"><i class="fa-solid fa-volume-high"></i></button></td>
           <td class="col-meaning" data-label="意味">${YNQ.escapeHtml(w.meaning)}</td>
           <td data-label="実施日">${dateCell}</td>
           <td data-label="暗記度"><button type="button" class="level-pill" style="background:${YNQ.LEVEL_COLORS[level]}" data-action="level" data-id="${w.id}">${level}</button></td>
@@ -206,6 +210,12 @@ window.WordlistTab = (function () {
     tbody.querySelectorAll('[data-action="level"]').forEach(btn => btn.addEventListener("click", (e) => openLevelPicker(e, btn.dataset.id)));
     tbody.querySelectorAll('[data-action="detail"]').forEach(btn => btn.addEventListener("click", () => openDetail(btn.dataset.id)));
     tbody.querySelectorAll('[data-action="reset"]').forEach(btn => btn.addEventListener("click", () => resetWord(btn.dataset.id)));
+    // 仕様追加2026/09/12 No.1: 単語の発音を読み上げる
+    tbody.querySelectorAll('[data-action="speak"]').forEach(btn => btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const w = allWords.find(x => x.id === btn.dataset.id);
+      if (w) YNQ.speakText(w.word, "en-US");
+    }));
   }
 
   // 今日の日付を "2026/05/25" 形式で返す(仕様#53)
@@ -235,14 +245,16 @@ window.WordlistTab = (function () {
 
   async function setWordLevel(wordId, level) {
     try {
+      const w = allWords.find(x => x.id === wordId);
+      // 初見日(初めて触れた日)は初回のみ記録し、以降の更新では変更しない(仕様追加2026/09/12 No.3)
+      const dateFields = YNQ.buildTestDateFields(w && w.firstSeenDate, todayFormatted());
       await wordsRef().doc(wordId).update({
         level,
         correctStreak: 0, // 手動変更のため、テストの連続正解カウントはリセットする
-        lastTestDate: todayFormatted(),
+        ...dateFields,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      const w = allWords.find(x => x.id === wordId);
-      if (w) { w.level = level; w.correctStreak = 0; w.lastTestDate = todayFormatted(); }
+      if (w) { w.level = level; w.correctStreak = 0; w.lastTestDate = dateFields.lastTestDate; w.firstSeenDate = dateFields.firstSeenDate; }
       renderAnalytics();
       applyFilters();
     } catch (err) {
@@ -281,7 +293,8 @@ window.WordlistTab = (function () {
       <div class="field"><label>単語</label><p>${YNQ.escapeHtml(w.word)}</p></div>
       <div class="field"><label>意味</label><p>${YNQ.escapeHtml(w.meaning)}</p></div>
       <div class="field"><label>暗記度</label><p><span class="level-pill" style="background:${YNQ.LEVEL_COLORS[level]};cursor:default;">${level}</span></p></div>
-      <div class="field"><label>実施日</label><p>${level === 0 ? "未実施" : YNQ.escapeHtml(w.lastTestDate || "-")}</p></div>
+      <div class="field"><label>初見日</label><p>${level === 0 ? "未実施" : YNQ.escapeHtml(w.firstSeenDate || w.lastTestDate || "-")}</p></div>
+      <div class="field"><label>更新日</label><p>${level === 0 ? "未実施" : YNQ.escapeHtml(w.lastTestDate || "-")}</p></div>
     `;
     YNQ.openModal("modal-word-detail");
   }
