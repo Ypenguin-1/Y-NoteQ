@@ -575,6 +575,8 @@ body {
 .patch-entry:first-child { padding-top: 0; }
 .patch-entry:last-child { border-bottom: none; }
 .patch-entry .patch-meta { font-size: 12px; color: var(--color-text-muted); font-family: var(--font-en); margin-bottom: 6px; }
+/* 仕様追加2026/09/12 No.5-4: テスト結果のポイント内訳(ラベルと数値を左右に並べる) */
+#points-breakdown .patch-entry { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; font-size: 13px; }
 .patch-entry ul { padding-left: 18px; list-style: disc; font-size: 13px; line-height: 1.7; }
 .patch-history-toggle {
   width: 100%;
@@ -887,7 +889,8 @@ table.word-table th {
   position: sticky;
   top: 0;
 }
-table.word-table td.col-word, table.word-table td.col-meaning { white-space: normal; max-width: 240px; }
+/* 仕様修正2026/09/12 No.5-1: 単語・意味に含まれる改行をそのまま見た目にも反映する */
+table.word-table td.col-word, table.word-table td.col-meaning { white-space: pre-line; max-width: 240px; }
 table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
 
 .badge-notdone {
@@ -1112,6 +1115,18 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
 .rank-badge-img { width: 100%; height: 100%; object-fit: contain; }
 .rank-summary-info { flex: 1; min-width: 200px; }
 .rank-summary-name { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+/* 仕様追加2026/09/12 No.5-6: ランクの現在期間ラベル(例: 26-Sum) */
+.rank-period-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  font-family: var(--font-en);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-bg-elevated);
+  color: var(--color-text-muted);
+  vertical-align: middle;
+}
 .rank-progress-bar { height: 10px; border-radius: 999px; background: var(--color-bg-elevated); overflow: hidden; margin-bottom: 6px; }
 .rank-progress-fill { height: 100%; background: var(--color-primary); transition: width .25s ease; }
 .rank-summary-points { font-size: 13px; color: var(--color-text-muted); }

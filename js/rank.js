@@ -22,6 +22,10 @@ window.YNQ_RANK = (function () {
   const LIGHT_BAND_TIERS = ["Iron", "Bronze", "Silver", "Gold"];       // 仕様B: ライトランク帯
   const HIGH_BAND_TIERS = ["Platinum", "Diamond", "Master", "Veritas"]; // 仕様B: 高ランク帯
 
+  // ランクptは常に小数第1位までの表記にする(仕様修正2026/09/12 No.5-5)。浮動小数点演算の
+  // 誤差(0.1+0.2=0.30000000000000004 のような)を防ぐため、状態を書き換えるたびに丸める。
+  function roundPt(n) { return Math.round((n || 0) * 10) / 10; }
+
   function tierHasDivisions(tier) { return tier !== "Veritas"; }
   function tierBand(tier) { return LIGHT_BAND_TIERS.includes(tier) ? "light" : "high"; }
 
@@ -87,7 +91,7 @@ window.YNQ_RANK = (function () {
       return rankState; // Unrankedの間はポイント制度の対象外(仕様A参照)
     }
     const state = { tier: rankState.tier, division: rankState.division, points: rankState.points || 0, graceUsed: !!rankState.graceUsed };
-    state.points += delta;
+    state.points = roundPt(state.points + delta);
 
     if (state.points < 0) {
       if (!state.graceUsed) {
@@ -115,7 +119,7 @@ window.YNQ_RANK = (function () {
         break;
       }
       const nextStep = stepAt(curIndex + 1);
-      state.points -= max;
+      state.points = roundPt(state.points - max);
       state.tier = nextStep.tier;
       state.division = nextStep.division;
       state.graceUsed = false; // 昇格したので猶予はリセット
@@ -238,23 +242,38 @@ window.YNQ_RANK = (function () {
   }
 
   /* ----------------------------------------------------------
-     4. 奇数月末デモーション(仕様Q)の判定
+     4. 季節期間(仕様追加2026/09/12 No.5-6)・奇数月末デモーション(仕様Q)の判定
+     季節は2か月ごとの6区分で、奇数月末日23:59がちょうどその期間の境界と一致する
+     (12-1月:Win, 2-3月:ESp, 4-5月:Spr, 6-7月:ESu, 8-9月:Sum, 10-11月:Aut)。
      ---------------------------------------------------------- */
-  // fromDate(前回チェック時刻)〜toDate(今)の間に「奇数月末日23:59」の境界を何回またいだかを返す。
-  // 長期間ログインしていなかった場合は複数回分をまとめて返す(呼び出し側でその回数分デモーションする)。
-  function countOddMonthEndBoundariesCrossed(fromDate, toDate) {
-    if (!(fromDate instanceof Date) || !(toDate instanceof Date) || fromDate >= toDate) return 0;
-    let count = 0;
+  const SEASON_CODE_BY_START_MONTH = { 12: "Win", 2: "ESp", 4: "Spr", 6: "ESu", 8: "Sum", 10: "Aut" };
+
+  // 表示用の期間ラベル(例: 2026年8月なら "26-Sum")。12-1月の期間は開始年(12月側)を採用する。
+  function seasonLabel(date) {
+    const m = date.getMonth() + 1; // 1〜12
+    let startMonth = m % 2 === 0 ? m : m - 1; // 各期間の開始月(偶数月)に丸める
+    let year = date.getFullYear();
+    if (startMonth === 0) { startMonth = 12; year -= 1; } // 1月は前年12月始まりのWin期間
+    const code = SEASON_CODE_BY_START_MONTH[startMonth];
+    const yy = String(((year % 100) + 100) % 100).padStart(2, "0");
+    return `${yy}-${code}`;
+  }
+
+  // fromDate(前回チェック時刻)〜toDate(今)の間にまたいだ「期間の境界(奇数月末日23:59)」を
+  // 古い順に全て返す。長期間ログインしていなかった場合は複数個まとめて返る。
+  function listSeasonBoundariesCrossed(fromDate, toDate) {
+    if (!(fromDate instanceof Date) || !(toDate instanceof Date) || fromDate >= toDate) return [];
+    const boundaries = [];
     let cursor = new Date(fromDate.getFullYear(), fromDate.getMonth(), 1);
     while (cursor <= toDate) {
       const monthNumber = cursor.getMonth() + 1; // 1〜12
-      if (monthNumber % 2 === 1) { // 奇数月(1,3,5,7,9,11)
+      if (monthNumber % 2 === 1) { // 奇数月(1,3,5,7,9,11)の末日が期間の境界
         const lastDay = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0, 23, 59, 0, 0);
-        if (lastDay > fromDate && lastDay <= toDate) count++;
+        if (lastDay > fromDate && lastDay <= toDate) boundaries.push(lastDay);
       }
       cursor = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
     }
-    return count;
+    return boundaries;
   }
 
   return {
@@ -263,6 +282,6 @@ window.YNQ_RANK = (function () {
     findStepIndex, stepAt, rankLabel, rankBadgeImagePath,
     applyRankPointsDelta, demoteRankBySteps, isRankHigherOrEqual,
     computeTestPoints, accuracyBonusPoints, pointsForLevelTransition,
-    countOddMonthEndBoundariesCrossed, daysBetweenYmd
+    listSeasonBoundariesCrossed, seasonLabel, daysBetweenYmd, roundPt
   };
 })();

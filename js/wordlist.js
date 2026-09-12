@@ -248,15 +248,15 @@ window.WordlistTab = (function () {
   async function setWordLevel(wordId, level) {
     try {
       const w = allWords.find(x => x.id === wordId);
-      // 初見日(初めて触れた日)は初回のみ記録し、以降の更新では変更しない(仕様追加2026/09/12 No.3)
-      const dateFields = YNQ.buildTestDateFields(w && w.firstSeenDate, todayFormatted());
+      // 初見日はLevel0→1になった時だけ(仕様修正2026/09/12 No.5-8)
+      const dateFields = YNQ.buildTestDateFields(w && w.level, w && w.firstSeenDate, todayFormatted());
       await wordsRef().doc(wordId).update({
         level,
         correctStreak: 0, // 手動変更のため、テストの連続正解カウントはリセットする
         ...dateFields,
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
-      if (w) { w.level = level; w.correctStreak = 0; w.lastTestDate = dateFields.lastTestDate; w.firstSeenDate = dateFields.firstSeenDate; }
+      if (w) { w.level = level; w.correctStreak = 0; Object.assign(w, dateFields); }
       renderAnalytics();
       applyFilters();
     } catch (err) {

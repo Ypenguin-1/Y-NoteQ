@@ -497,8 +497,8 @@ window.TestTab = (function () {
         // 毎回保存する必要があるため、回答したすべての単語を書き込み対象にする
         answers.forEach(a => {
           const w = allWords.find(x => x.id === a.wordId);
-          // 初見日(初めて触れた日)は初回のみ記録し、以降の更新では変更しない(仕様追加2026/09/12 No.3)
-          const dateFields = YNQ.buildTestDateFields(w && w.firstSeenDate, today);
+          // 初見日はLevel0→1になった時だけ記録し、それ以外の遷移では変更しない(仕様修正2026/09/12 No.5-8)
+          const dateFields = YNQ.buildTestDateFields(a.levelBefore, w && w.firstSeenDate, today);
           batch.update(wordsRef().doc(a.wordId), {
             level: a.levelAfter,
             correctStreak: a.streakAfter || 0,
@@ -509,7 +509,11 @@ window.TestTab = (function () {
         await batch.commit();
         answers.forEach(a => {
           const w = allWords.find(x => x.id === a.wordId);
-          if (w) { w.level = a.levelAfter; w.correctStreak = a.streakAfter || 0; w.lastTestDate = today; w.firstSeenDate = w.firstSeenDate || today; }
+          if (w) {
+            w.level = a.levelAfter; w.correctStreak = a.streakAfter || 0; w.lastTestDate = today;
+            // 初見日はLevel0→1になった時だけ(仕様修正2026/09/12 No.5-8)
+            if ((a.levelBefore || 0) === 0 && !w.firstSeenDate) w.firstSeenDate = today;
+          }
         });
       }
 
@@ -557,6 +561,7 @@ window.TestTab = (function () {
             peakRank: newRank,
             peakRankAt: firebase.firestore.FieldValue.serverTimestamp()
           }, { merge: true });
+          await YNQ.logRankPromotionIfNeeded(userRef, rank, newRank); // 仕様R
           YNQ.showToast("Iron Ⅰ に昇格しました!");
         } else {
           await userRef.set({ qualifyingTestCount }, { merge: true });
@@ -573,6 +578,7 @@ window.TestTab = (function () {
       const updateData = { rank: newRankState };
       YNQ.maybeUpdatePeakRank(updateData, data.peakRank, newRankState); // 仕様R: 履歴表示用
       await userRef.set(updateData, { merge: true });
+      await YNQ.logRankPromotionIfNeeded(userRef, rank, newRankState); // 仕様R: 昇格を履歴に記録
       return pointsResult;
     } catch (err) {
       console.error("[test:applyRankProgressForTest]", err);
@@ -580,13 +586,44 @@ window.TestTab = (function () {
     }
   }
 
+  // ポイントを常に小数第1位までの表記にする(仕様修正2026/09/12 No.5-5)
+  function formatPt(n) {
+    return `${n >= 0 ? "+" : ""}${n.toFixed(1)}pt`;
+  }
+
+  // 仕様追加2026/09/12 No.5-4: 獲得ポイントの内訳を開閉できる詳細表示として出す
+  const POINTS_BREAKDOWN_LABELS = {
+    level0Touch: "Level0の単語に触れた(仕様E)",
+    levelTransition: "Levelの維持・変動(仕様H〜L)",
+    tenQuestionBonus: "出題数ボーナス(10問ごと・仕様M)",
+    accuracyBonus: "正答率ボーナス/ペナルティ(仕様N)",
+    recentTouchBonus: "直近5日以内の復習ボーナス(仕様P)"
+  };
+  function renderPointsBreakdown() {
+    const btn = document.getElementById("btn-toggle-points-breakdown");
+    const panel = document.getElementById("points-breakdown");
+    if (!lastTestPoints) {
+      btn.hidden = true;
+      panel.hidden = true;
+      return;
+    }
+    btn.hidden = false;
+    panel.innerHTML = Object.keys(POINTS_BREAKDOWN_LABELS).map(key => `
+      <div class="patch-entry">
+        <span>${POINTS_BREAKDOWN_LABELS[key]}</span>
+        <strong>${formatPt(lastTestPoints.breakdown[key] || 0)}</strong>
+      </div>
+    `).join("");
+  }
+
   function renderResults() {
     const total = answers.length;
     const correctCount = answers.filter(a => a.isCorrect).length;
     const pct = total > 0 ? Math.round((correctCount / total) * 1000) / 10 : 0;
     // 仕様追加2026/09/12 No.4-G: 獲得ポイントを表示(ランクなしの間は表示しない)
-    const pointsHtml = lastTestPoints ? `<small>獲得ポイント: ${lastTestPoints.total >= 0 ? "+" : ""}${lastTestPoints.total}pt</small>` : "";
+    const pointsHtml = lastTestPoints ? `<small>獲得ポイント: ${formatPt(lastTestPoints.total)}</small>` : "";
     document.getElementById("test-result-score").innerHTML = `${pct}%<small>${correctCount} / ${total} 問正解</small>${pointsHtml}`;
+    renderPointsBreakdown(); // 仕様追加2026/09/12 No.5-4
 
     const tbody = document.getElementById("test-result-body");
     tbody.innerHTML = answers.map((a, idx) => `
@@ -625,13 +662,14 @@ window.TestTab = (function () {
         a.streakAfter = 0; // 手動修正のため、連続正解カウントはリセットする
         try {
           const w = allWords.find(x => x.id === a.wordId);
-          // 初見日(初めて触れた日)は初回のみ記録し、以降の更新では変更しない(仕様追加2026/09/12 No.3)
-          const dateFields = YNQ.buildTestDateFields(w && w.firstSeenDate, todayFormatted());
+          // 初見日はLevel0→1になった時だけ(仕様修正2026/09/12 No.5-8)。ここでは元々の(テスト前の)
+          // levelBeforeを基準に判定する(手動修正はそのテストの結果を訂正しているだけのため)
+          const dateFields = YNQ.buildTestDateFields(a.levelBefore, w && w.firstSeenDate, todayFormatted());
           await wordsRef().doc(a.wordId).update({
             level: lv, correctStreak: 0, ...dateFields,
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
-          if (w) { w.level = lv; w.correctStreak = 0; w.lastTestDate = dateFields.lastTestDate; w.firstSeenDate = dateFields.firstSeenDate; }
+          if (w) { w.level = lv; w.correctStreak = 0; Object.assign(w, dateFields); }
           renderResults();
         } catch (err) {
           console.error("[test:openResultLevelPicker]", err);
@@ -655,6 +693,15 @@ window.TestTab = (function () {
       beginRun();
     });
     document.getElementById("btn-result-export-pdf").addEventListener("click", exportResultPdf);
+
+    // 仕様追加2026/09/12 No.5-4: ポイント内訳の開閉
+    document.getElementById("btn-toggle-points-breakdown").addEventListener("click", (e) => {
+      const panel = document.getElementById("points-breakdown");
+      panel.hidden = !panel.hidden;
+      e.currentTarget.innerHTML = panel.hidden
+        ? 'ポイントの内訳を見る <i class="fa-solid fa-chevron-down"></i>'
+        : '閉じる <i class="fa-solid fa-chevron-up"></i>';
+    });
 
     // ポップオーバーの外側クリックで閉じる(単語一覧タブ側と共通の要素のため、未登録でもここで保証する)
     document.addEventListener("click", (e) => {

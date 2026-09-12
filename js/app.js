@@ -49,7 +49,8 @@ const HOWTO_CONTENT = [
   { title: "単語帳を編集する", body: "フォルダーを開き、単語帳の「編集」タブから単語の追加・修正・削除ができます。" },
   { title: "テストで暗記度を上げる", body: "「テスト」タブで出題範囲・出題形式(単語カード/4択/入力記述)などを設定して小テストを開始できます。Level採点をONにすると正誤に応じて暗記度(Level)が自動で変動します。" },
   { title: "単語を編集する", body: "「編集」タブから単語の直接追加、CSV/Excelファイルからの一括インポート、単語ごとの修正・リセット・削除、範囲指定での一括操作ができます。" },
-  { title: "自分の記録を見る", body: "ヘッダーのアカウントアイコン→「プロフィール」から、全単語帳を合計した暗記度の状況や、直近のテスト実施記録を確認できます。" }
+  { title: "自分の記録を見る", body: "ヘッダーのアカウントアイコン→「プロフィール」から、全単語帳を合計した暗記度の状況や、直近のテスト実施記録を確認できます。" },
+  { title: "ランク制度について", body: "テスト(単語カードを除く)を5回行うと「Iron Ⅰ」からランクが始まります。Iron〜Veritasの8階級・各3段階(Veritasのみ段階なし)で、テストの成績や毎日のログインでポイントを獲得して昇格していきます。アカウントタブの「ランク」欄でバッジ・ポイント状況・過去の履歴を確認できます。ポイントが0を下回るとランクが1段階下がりますが、0ptになった直後の1回だけは踏みとどまれます。また、Diamond以上のランクは奇数月末(1・3・5・7・9・11月の末日23:59)にランクが2段階下がるので、継続してプレーしましょう。" }
 ];
 // ▲▲ ここまでユーザー編集エリア ▲▲
 
@@ -208,14 +209,17 @@ YNQ.playCorrectSound = playCorrectSound;
 YNQ.playIncorrectSound = playIncorrectSound;
 YNQ.playResultSound = playResultSound;
 
-// 単語を「実施(テストや手動でLevel変更)」した際に書き込む日付フィールドを組み立てる(仕様追加2026/09/12 No.3)。
+// 単語を「実施(テストや手動でLevel変更)」した際に書き込む日付フィールドを組み立てる(仕様追加2026/09/12 No.3、
+// 仕様修正2026/09/12 No.5-8)。
 // ・更新日(lastTestDate) は毎回、今日の日付で更新する。
-// ・初見日(firstSeenDate) は初めて触れた時だけ記録し、既に値があればそれを維持する(変更しない)。
-function buildTestDateFields(existingFirstSeenDate, today) {
-  return {
-    lastTestDate: today,
-    firstSeenDate: existingFirstSeenDate || today
-  };
+// ・初見日(firstSeenDate) は「Level0(未実施)から1になった」その瞬間だけ記録し、それ以外の遷移
+//   (Level1→2、3→2 など)では一切変更しない。既に値がある場合も上書きしない。
+function buildTestDateFields(levelBefore, existingFirstSeenDate, today) {
+  const fields = { lastTestDate: today };
+  if ((levelBefore || 0) === 0 && !existingFirstSeenDate) {
+    fields.firstSeenDate = today;
+  }
+  return fields;
 }
 
 // 表(テーブル要素)をPDFとして書き出す共通処理(単語一覧・テストの各タブから利用)。
@@ -841,6 +845,25 @@ function maybeUpdatePeakRank(updateData, peakRank, newRank) {
 }
 YNQ.maybeUpdatePeakRank = maybeUpdatePeakRank;
 
+// 仕様追加2026/09/12 No.5-7: ランクが上がった(推移した)場合に履歴へ記録する。
+// 同じ期間内は複数件そのまま並び、期間が終了すると applySeasonalRankCheckIfNeeded 側で
+// その期間内の最高ランクだけを残して他は削除される。
+async function logRankPromotionIfNeeded(userRef, oldRank, newRank) {
+  const oldIndex = (oldRank && oldRank.tier !== "Unranked") ? YNQ_RANK.findStepIndex(oldRank.tier, oldRank.division) : -1;
+  const newIndex = YNQ_RANK.findStepIndex(newRank.tier, newRank.division);
+  if (newIndex <= oldIndex) return; // 維持/降格の場合は記録しない
+  try {
+    await userRef.collection("rankHistory").add({
+      rank: { tier: newRank.tier, division: newRank.division },
+      achievedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      period: YNQ_RANK.seasonLabel(new Date())
+    });
+  } catch (err) {
+    console.error("[logRankPromotionIfNeeded]", err);
+  }
+}
+YNQ.logRankPromotionIfNeeded = logRankPromotionIfNeeded;
+
 function todayYmd() {
   const d = new Date();
   return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
@@ -865,6 +888,13 @@ async function applyDailyLoginBonusIfNeeded(user) {
     const updateData = { rank: newRank, lastLoginBonusDate: today };
     maybeUpdatePeakRank(updateData, data.peakRank, newRank);
     await userRef.set(updateData, { merge: true });
+    await logRankPromotionIfNeeded(userRef, rank, newRank);
+    // 仕様修正2026/09/12 No.5-9: ログインボーナスも「テスト実施記録・ポイント獲得記録」に残す
+    await userRef.collection("testResults").add({
+      type: "login",
+      pointsEarned: bonus,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
     showToast(`ログインボーナス +${bonus}pt`);
   } catch (err) {
     console.error("[applyDailyLoginBonusIfNeeded]", err);
@@ -872,12 +902,32 @@ async function applyDailyLoginBonusIfNeeded(user) {
 }
 
 /* ----------------------------------------------------------
-   7.7 ランク制度: 奇数月末デモーション・ランク履歴(仕様追加2026/09/12 No.4-Q,R)
+   7.7 ランク制度: 期間の集約・奇数月末デモーション(仕様追加2026/09/12 No.4-Q,R / No.5-6,7)
    ※このアプリはサーバー側のスケジュール実行(cron等)を持たないため、あくまで
-     「ユーザーがアプリを開いたタイミングで、前回チェック以降に奇数月末23:59を
+     「ユーザーがアプリを開いたタイミングで、前回チェック以降に期間の境界(奇数月末23:59)を
      またいでいないか」をその都度確認する形の簡易実装になっている。
    ---------------------------------------------------------- */
 const SEASON_DEMOTION_TARGET_TIERS = ["Diamond", "Master", "Veritas"]; // 仕様Q
+
+// 仕様R: 指定した期間(period)のrankHistoryのうち、最高ランクのものだけを残して他を削除する。
+// (期間中は昇格のたびに複数件並ぶが、期間が終了したらその期間の最高到達ランク1件だけにする)
+async function collapsePeriodHistory(userRef, period) {
+  try {
+    const snap = await userRef.collection("rankHistory").where("period", "==", period).get();
+    if (snap.size <= 1) return; // 0件 or 1件なら集約不要
+    let bestDoc = null, bestIndex = -1;
+    snap.forEach(doc => {
+      const r = doc.data().rank;
+      const idx = r ? YNQ_RANK.findStepIndex(r.tier, r.division) : -1;
+      if (idx > bestIndex) { bestIndex = idx; bestDoc = doc; }
+    });
+    const batch = db.batch();
+    snap.forEach(doc => { if (!bestDoc || doc.id !== bestDoc.id) batch.delete(doc.ref); });
+    await batch.commit();
+  } catch (err) {
+    console.error("[collapsePeriodHistory]", err);
+  }
+}
 
 async function applySeasonalRankCheckIfNeeded(user) {
   const userRef = db.collection("users").doc(user.uid);
@@ -889,41 +939,32 @@ async function applySeasonalRankCheckIfNeeded(user) {
     const now = new Date();
     const lastCheck = (data.lastSeasonCheckAt && data.lastSeasonCheckAt.toDate) ? data.lastSeasonCheckAt.toDate() : now;
 
-    if (!rank || !SEASON_DEMOTION_TARGET_TIERS.includes(rank.tier)) {
-      // 対象ランクでなくても、次回チェックの起点として今回のログイン時刻は保存しておく
+    const boundaries = YNQ_RANK.listSeasonBoundariesCrossed(lastCheck, now);
+    if (boundaries.length === 0) {
       await userRef.set({ lastSeasonCheckAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
       return;
     }
 
-    const boundaries = YNQ_RANK.countOddMonthEndBoundariesCrossed(lastCheck, now);
-    if (boundaries <= 0) {
-      await userRef.set({ lastSeasonCheckAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
-      return;
+    // 仕様R: またいだ期間ごとに、その期間内の最高ランクだけを残して履歴を集約する(全ユーザー対象)
+    for (const boundary of boundaries) {
+      await collapsePeriodHistory(userRef, YNQ_RANK.seasonLabel(boundary));
     }
 
-    // 仕様Q: 対象タイミングを1回またぐごとにランクを2段階下げる(長期間未ログインで複数回分を一度に処理する場合もある)
+    // 仕様Q: Diamond/Master/Veritasのみ、対象タイミングを1回またぐごとにランクを2段階下げる
     let currentRank = rank;
-    let peakRank = data.peakRank;
-    let peakRankAt = data.peakRankAt || now;
-    const historyEntries = [];
-    for (let i = 0; i < boundaries; i++) {
-      if (!SEASON_DEMOTION_TARGET_TIERS.includes(currentRank.tier)) break; // 降格して対象外になったら打ち切り
-      // 仕様R: 降格前にその期間の最高到達ランクと到達日時を履歴に残す
-      historyEntries.push({ rank: peakRank || currentRank, achievedAt: peakRankAt, demotedAt: now });
-      currentRank = YNQ_RANK.demoteRankBySteps(currentRank, 2);
-      peakRank = { tier: currentRank.tier, division: currentRank.division };
-      peakRankAt = now;
+    let demoted = false;
+    if (rank) {
+      for (let i = 0; i < boundaries.length; i++) {
+        if (!SEASON_DEMOTION_TARGET_TIERS.includes(currentRank.tier)) break; // 降格して対象外になったら打ち切り
+        currentRank = YNQ_RANK.demoteRankBySteps(currentRank, 2);
+        demoted = true;
+      }
     }
 
-    const batch = db.batch();
-    batch.set(userRef, {
-      rank: currentRank,
-      peakRank, peakRankAt,
-      lastSeasonCheckAt: firebase.firestore.FieldValue.serverTimestamp()
-    }, { merge: true });
-    historyEntries.forEach(entry => batch.set(userRef.collection("rankHistory").doc(), entry));
-    await batch.commit();
-    showToast(`定期デモーションにより ${YNQ_RANK.rankLabel(currentRank)} に降格しました`);
+    const updateData = { lastSeasonCheckAt: firebase.firestore.FieldValue.serverTimestamp() };
+    if (demoted) updateData.rank = currentRank;
+    await userRef.set(updateData, { merge: true });
+    if (demoted) showToast(`定期デモーションにより ${YNQ_RANK.rankLabel(currentRank)} に降格しました`);
   } catch (err) {
     console.error("[applySeasonalRankCheckIfNeeded]", err);
   }
