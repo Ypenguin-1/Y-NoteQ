@@ -1105,7 +1105,19 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
 }
 
 /* ============================================================
-   7.10 共有タブ(tabs/share.html / js/share.js)仕様追加2026/09/12 No.4
+   7.10 アカウントタブ: ランク欄(仕様追加2026/09/12 ランク制度)
+   ============================================================ */
+.rank-summary { display: flex; align-items: center; gap: 20px; margin-bottom: 4px; flex-wrap: wrap; }
+.rank-badge-wrap { flex-shrink: 0; width: 72px; height: 72px; }
+.rank-badge-img { width: 100%; height: 100%; object-fit: contain; }
+.rank-summary-info { flex: 1; min-width: 200px; }
+.rank-summary-name { font-size: 18px; font-weight: 800; margin-bottom: 6px; }
+.rank-progress-bar { height: 10px; border-radius: 999px; background: var(--color-bg-elevated); overflow: hidden; margin-bottom: 6px; }
+.rank-progress-fill { height: 100%; background: var(--color-primary); transition: width .25s ease; }
+.rank-summary-points { font-size: 13px; color: var(--color-text-muted); }
+
+/* ============================================================
+   7.11 共有タブ(tabs/share.html / js/share.js)
    ============================================================ */
 .shared-card { aspect-ratio: auto; padding: 16px; }
 .shared-card-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; }

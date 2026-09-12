@@ -27,6 +27,12 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == uid;
     }
 
+    // ランク履歴(users/{uid}/rankHistory/{entryId}) : 仕様追加2026/09/12(ランク制度・仕様Q,R)
+    // 奇数月末デモーション時に、その期間の最高到達ランクと到達/降格日時を記録する。本人のみ読み書き可能。
+    match /users/{uid}/rankHistory/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
     // 共有単語帳(sharedWordbooks/{id}, サブコレクション words) : 仕様追加2026/09/12 No.4
     // ・読み取りはログイン済みユーザーなら誰でも可能(共有一覧の閲覧・インストール用)
     // ・作成/更新/削除は投稿者本人のみ。official(公式)フラグはFirebaseコンソールから手動で付与する想定のため、

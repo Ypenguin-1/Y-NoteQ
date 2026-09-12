@@ -15,6 +15,7 @@ window.AccountTab = (function () {
 
   function init() {
     loadProfile();
+    loadRankSummary(); // 仕様追加2026/09/12 No.4
     loadLevelAggregate();
     loadTestHistory();
     bindEvents();
@@ -43,6 +44,84 @@ window.AccountTab = (function () {
       renderAvatarColorSwatches();
       updateAvatarPreview();
     });
+
+    // 仕様追加2026/09/12 No.4-R: 過去のランク履歴の開閉
+    document.getElementById("btn-toggle-rank-history").addEventListener("click", (e) => {
+      const hist = document.getElementById("rank-history");
+      hist.hidden = !hist.hidden;
+      e.currentTarget.innerHTML = hist.hidden
+        ? '過去のランク履歴を見る <i class="fa-solid fa-chevron-down"></i>'
+        : '閉じる <i class="fa-solid fa-chevron-up"></i>';
+      if (!hist.hidden) loadRankHistory();
+    });
+  }
+
+  /* ---------- ランク(仕様追加2026/09/12 No.4) ---------- */
+  async function loadRankSummary() {
+    const nameEl = document.getElementById("rank-summary-name");
+    const imgEl = document.getElementById("rank-badge-img");
+    const barWrap = document.getElementById("rank-progress-bar");
+    const barFill = document.getElementById("rank-progress-fill");
+    const pointsEl = document.getElementById("rank-summary-points");
+
+    try {
+      const doc = await YNQ.db.collection("users").doc(YNQ.currentUser.uid).get();
+      const data = doc.exists ? doc.data() : {};
+      const rank = data.rank || { tier: "Unranked", division: null, points: 0 };
+      const qualifyingTestCount = data.qualifyingTestCount || 0;
+
+      imgEl.src = YNQ_RANK.rankBadgeImagePath(rank);
+      nameEl.textContent = YNQ_RANK.rankLabel(rank);
+
+      if (rank.tier === "Unranked") {
+        barWrap.hidden = true;
+        pointsEl.textContent = `テスト(単語カードを除く)を${qualifyingTestCount}/5回実施しました。5回でIron Ⅰが解放されます。`;
+        return;
+      }
+
+      const max = YNQ_RANK.tierMaxPoints(rank.tier);
+      const band = YNQ_RANK.tierBand(rank.tier) === "light" ? "ライトランク帯" : "高ランク帯";
+      if (max === null) {
+        // Veritasは上限なし(仕様: 200pt maxとせず上限を設定しない)
+        barWrap.hidden = true;
+        pointsEl.textContent = `${rank.points}pt(${band}・上限なし)`;
+      } else {
+        barWrap.hidden = false;
+        barFill.style.width = `${Math.max(0, Math.min(100, (rank.points / max) * 100))}%`;
+        pointsEl.textContent = `${rank.points} / ${max}pt(${band})`;
+      }
+    } catch (err) {
+      console.error("[account:loadRankSummary]", err);
+      nameEl.textContent = "読み込みに失敗しました";
+    }
+  }
+
+  // 仕様R: 奇数月末デモーション(仕様Q)で降格した際の、期間中の最高ランクと到達日時の履歴
+  async function loadRankHistory() {
+    const tbody = document.getElementById("rank-history-body");
+    tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--color-text-muted);padding:16px;">読み込み中...</td></tr>`;
+    try {
+      const snap = await YNQ.db.collection("users").doc(YNQ.currentUser.uid)
+        .collection("rankHistory").orderBy("demotedAt", "desc").limit(20).get();
+      if (snap.empty) {
+        tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--color-text-muted);padding:16px;">まだ履歴がありません</td></tr>`;
+        return;
+      }
+      tbody.innerHTML = snap.docs.map(d => {
+        const r = d.data();
+        const achieved = (r.achievedAt && r.achievedAt.toDate) ? formatDateTime(r.achievedAt.toDate()) : "-";
+        const demoted = (r.demotedAt && r.demotedAt.toDate) ? formatDateTime(r.demotedAt.toDate()) : "-";
+        return `
+          <tr>
+            <td>${YNQ.escapeHtml(YNQ_RANK.rankLabel(r.rank))}</td>
+            <td>${YNQ.escapeHtml(achieved)}</td>
+            <td>${YNQ.escapeHtml(demoted)}</td>
+          </tr>`;
+      }).join("");
+    } catch (err) {
+      console.error("[account:loadRankHistory]", err);
+      tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--color-danger);padding:16px;">読み込みに失敗しました</td></tr>`;
+    }
   }
 
   /* ---------- プロフィール(ユーザーネーム・アイコン) ---------- */
@@ -198,24 +277,29 @@ window.AccountTab = (function () {
         .collection("testResults").orderBy("createdAt", "desc").limit(20).get();
 
       if (snap.empty) {
-        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--color-text-muted);padding:20px;">まだテストの実施記録がありません</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--color-text-muted);padding:20px;">まだテストの実施記録がありません</td></tr>`;
         return;
       }
 
       tbody.innerHTML = snap.docs.map(d => {
         const r = d.data();
         const date = (r.createdAt && r.createdAt.toDate) ? formatDateTime(r.createdAt.toDate()) : "-";
+        // 仕様S: ポイント履歴もここから見られるように(ランクなし期間のテストはnullのため「-」表示)
+        const pointsCell = (r.pointsEarned === null || r.pointsEarned === undefined)
+          ? "-"
+          : `${r.pointsEarned >= 0 ? "+" : ""}${r.pointsEarned}pt`;
         return `
           <tr>
             <td>${YNQ.escapeHtml(date)}</td>
             <td class="col-word">${YNQ.escapeHtml(r.bookName || "-")}</td>
             <td>${YNQ.escapeHtml(FORMAT_LABEL[r.format] || r.format || "-")}</td>
             <td>${r.accuracyPct}% (${r.correctCount}/${r.total})</td>
+            <td>${pointsCell}</td>
           </tr>`;
       }).join("");
     } catch (err) {
       console.error("[account:loadTestHistory]", err);
-      tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;color:var(--color-danger);padding:20px;">読み込みに失敗しました</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--color-danger);padding:20px;">読み込みに失敗しました</td></tr>`;
     }
   }
 

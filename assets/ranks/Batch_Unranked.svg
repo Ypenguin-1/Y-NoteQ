@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!-- プレースホルダー画像(仕様追加2026/09/12 ランク制度)。本番用の画像が届いたら同じファイル名で差し替えてください。 -->
+
+  <circle cx="60" cy="60" r="46" fill="none" stroke="#c7ced3" stroke-width="4" stroke-dasharray="6 6"/>
+  <text x="60" y="70" text-anchor="middle" font-family="Arial, sans-serif" font-size="40" font-weight="700" fill="#9aa3ab">?</text>
+
+</svg>

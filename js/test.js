@@ -16,6 +16,7 @@ window.TestTab = (function () {
 
   let currentWord = null, currentAnswerField = null;
   let questionAnswered = false;
+  let lastTestPoints = null; // 直近のテストで獲得したランクポイント(仕様追加2026/09/12 No.4)。ランクなしの間はnull
 
   const timer = { remaining: 0, intervalId: null };
 
@@ -388,7 +389,8 @@ window.TestTab = (function () {
       prompt: document.getElementById("test-question-prompt").textContent,
       correctAnswer: firstAlt(currentWord[currentAnswerField]),
       userAnswer: userAnswerDisplay,
-      isCorrect, levelBefore, levelAfter, streakAfter: update.streak
+      isCorrect, levelBefore, levelAfter, streakAfter: update.streak,
+      prevLastTestDate: currentWord.lastTestDate || null // 仕様追加2026/09/12 No.4-P: 更新される前の実施日(ランクポイント計算用)
     });
 
     if (settings.scoringTiming === "each") {
@@ -486,6 +488,7 @@ window.TestTab = (function () {
   async function persistResults() {
     const total = answers.length;
     const correctCount = answers.filter(a => a.isCorrect).length;
+    lastTestPoints = null;
     try {
       if (settings.levelScoring && total > 0) {
         const batch = YNQ.db.batch();
@@ -510,6 +513,10 @@ window.TestTab = (function () {
         });
       }
 
+      // 仕様追加2026/09/12 No.4: ランクポイントの計算・付与(単語カードでは仕様Eのみ、それ以外は仕様H〜Pも対象)
+      const pointsResult = await applyRankProgressForTest();
+      lastTestPoints = pointsResult; // ランクなしの場合はnullのまま(結果画面では表示しない)
+
       // テスト実施記録を保存(将来のアカウントタブでの履歴表示用)
       await YNQ.db.collection("users").doc(YNQ.currentUser.uid).collection("testResults").add({
         folderId: YNQ.currentFolder.id, folderName: YNQ.currentFolder.name,
@@ -517,6 +524,7 @@ window.TestTab = (function () {
         total, correctCount,
         accuracyPct: total > 0 ? Math.round((correctCount / total) * 1000) / 10 : 0,
         format: settings.format, direction: settings.direction,
+        pointsEarned: pointsResult ? pointsResult.total : null, // 仕様S: ポイント履歴もテスト実施記録から見られるように
         createdAt: firebase.firestore.FieldValue.serverTimestamp()
       });
     } catch (err) {
@@ -525,11 +533,60 @@ window.TestTab = (function () {
     }
   }
 
+  // 仕様追加2026/09/12 No.4-A,E〜P: ランクの進行(Unranked解除・ポイント加算・昇格/降格)をまとめて処理する。
+  // 戻り値: ランクありの場合は { total, breakdown } のポイント内訳、Unrankedのままの場合は null。
+  async function applyRankProgressForTest() {
+    const userRef = YNQ.db.collection("users").doc(YNQ.currentUser.uid);
+    const isQualifyingFormat = settings.format !== "flashcard"; // 仕様A・G: 単語カードは対象外
+
+    try {
+      const userDoc = await userRef.get();
+      const data = userDoc.exists ? userDoc.data() : {};
+      const rank = data.rank || { tier: "Unranked", division: null, points: 0, graceUsed: false };
+      const today = todayFormatted();
+
+      // 仕様A: Unrankedの間は、単語カード以外のテストを5回行ったらIron Iを付与する
+      if (rank.tier === "Unranked") {
+        if (!isQualifyingFormat) return null;
+        const qualifyingTestCount = (data.qualifyingTestCount || 0) + 1;
+        if (qualifyingTestCount >= 5) {
+          const newRank = { tier: "Iron", division: 1, points: 0, graceUsed: false };
+          await userRef.set({
+            qualifyingTestCount,
+            rank: newRank,
+            peakRank: newRank,
+            peakRankAt: firebase.firestore.FieldValue.serverTimestamp()
+          }, { merge: true });
+          YNQ.showToast("Iron Ⅰ に昇格しました!");
+        } else {
+          await userRef.set({ qualifyingTestCount }, { merge: true });
+        }
+        return null; // 昇格したそのテスト自体はポイント付与の対象外(まだランク未確定だったため)
+      }
+
+      // すでにランクがある場合: ポイントを計算して加算する
+      const pointsResult = YNQ_RANK.computeTestPoints({
+        answers, format: settings.format, levelScoring: settings.levelScoring, today
+      });
+      const newRankState = YNQ_RANK.applyRankPointsDelta(rank, pointsResult.total);
+
+      const updateData = { rank: newRankState };
+      YNQ.maybeUpdatePeakRank(updateData, data.peakRank, newRankState); // 仕様R: 履歴表示用
+      await userRef.set(updateData, { merge: true });
+      return pointsResult;
+    } catch (err) {
+      console.error("[test:applyRankProgressForTest]", err);
+      return null; // ランク更新に失敗してもテスト結果自体の表示は継続する
+    }
+  }
+
   function renderResults() {
     const total = answers.length;
     const correctCount = answers.filter(a => a.isCorrect).length;
     const pct = total > 0 ? Math.round((correctCount / total) * 1000) / 10 : 0;
-    document.getElementById("test-result-score").innerHTML = `${pct}%<small>${correctCount} / ${total} 問正解</small>`;
+    // 仕様追加2026/09/12 No.4-G: 獲得ポイントを表示(ランクなしの間は表示しない)
+    const pointsHtml = lastTestPoints ? `<small>獲得ポイント: ${lastTestPoints.total >= 0 ? "+" : ""}${lastTestPoints.total}pt</small>` : "";
+    document.getElementById("test-result-score").innerHTML = `${pct}%<small>${correctCount} / ${total} 問正解</small>${pointsHtml}`;
 
     const tbody = document.getElementById("test-result-body");
     tbody.innerHTML = answers.map((a, idx) => `
