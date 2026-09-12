@@ -29,13 +29,13 @@ const db = firebase.firestore();
 // (①招待コードのステップが自動的にスキップされる)。
 const REQUIRE_INVITE_CODE = true;
 
-// 暗記度(Level)の表示色。仕様で固定されている値。
+// 暗記度(Level)の表示色。仕様で固定されている値(仕様修正2026/09/12 No.2)。
 const LEVEL_COLORS = {
-  0: "#cccccc",
-  1: "#2a8cef",
-  2: "#72ef2a",
-  3: "#e9fa19",
-  4: "#fa6c19",
+  0: "#A6A6A6",
+  1: "#1781F5",
+  2: "#04D213",
+  3: "#E4F600",
+  4: "#FF9B09",
   5: "#ff4e4d"
 };
 
@@ -57,6 +57,22 @@ const HOWTO_CONTENT = [
 // index 0 が最新版として常に開いた状態で表示され、それ以外は「過去のアップデート」に格納される。
 // ▼▼ ここから先はユーザーが自由に編集してよい(バージョン追加用コメント) ▼▼
 const PATCH_NOTES = [
+  {
+    version: "0.5.0",
+    date: "2026/09/12",
+    items: [
+      "ライトモードの背景色/文字色、ダークモードの文字色を変更",
+      "暗記度(Level)の表示色を変更",
+      "各所のボタンにホバー時のスタイルを追加",
+      "「使い方」「パッチノート」ボタンにアイコンを追加",
+      "アカウントアイコンの背景色・表示文字(最大2文字)をユーザーが変更できるように対応",
+      "テスト開始後(実施画面・結果画面)からも、そのテストと同じ内容をPDF出力できるように対応",
+      "PDF出力を常にライトモード(背景:白)で行うように統一",
+      "「フォルダー一覧」を正方形のカード表示に変更し、フォルダー名・単語帳数・説明を表示。フォルダー/単語帳に説明(任意)を追加",
+      "「単語一覧」タブをスマホ縦画面でも横スクロールなしで見られるように対応",
+      "ダークモードで実施日カレンダーの表示が消える不具合を修正"
+    ]
+  },
   {
     version: "0.4.0",
     date: "2026/09/11",
@@ -133,9 +149,17 @@ function escapeHtml(str) {
 
 // 表(テーブル要素)をPDFとして書き出す共通処理(単語一覧・テストの各タブから利用)。
 // jsPDFの標準フォントは日本語非対応のため、html2canvasで表を画像化してPDFに貼り付ける方式にしている。
+// 仕様修正2026/09/12 No.7: 現在の画面がダークモードでも、PDFは常にライトモード(背景:白)で出力する。
+// html2canvasのoncloneコールバックは画面外の複製ドキュメント内でのみ実行されるため、
+// 実際に表示中の画面には一切影響を与えずに複製側だけを強制的にライトテーマ化できる。
 async function exportTableAsPdf(tableEl, title, filename) {
-  const bgColor = getComputedStyle(document.body).getPropertyValue("--color-bg-card").trim() || "#ffffff";
-  const canvas = await html2canvas(tableEl, { scale: 2, backgroundColor: bgColor });
+  const canvas = await html2canvas(tableEl, {
+    scale: 2,
+    backgroundColor: "#ffffff",
+    onclone: (clonedDoc) => {
+      clonedDoc.documentElement.setAttribute("data-theme", "light");
+    }
+  });
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
@@ -482,25 +506,30 @@ async function handleLogin(e) {
    ---------------------------------------------------------- */
 
 // ログイン中ユーザーの情報をヘッダーのアカウントアイコンに反映する
+// 仕様修正2026/09/12 No.5: 表示文字はユーザーが指定した avatarText(最大2文字)を優先し、
+// 未設定の場合のみユーザーネームの頭文字にフォールバックする。
 async function loadAccountBadge(user) {
   const badge = document.getElementById("btn-account");
-  let username = user.email ? user.email[0].toUpperCase() : "?";
+  let text = user.email ? user.email[0].toUpperCase() : "?";
   let color = AVATAR_COLORS[hashString(user.uid) % AVATAR_COLORS.length];
 
   try {
     const doc = await db.collection("users").doc(user.uid).get();
     if (doc.exists) {
       const data = doc.data();
-      if (data.username) username = data.username[0].toUpperCase();
+      if (data.username) text = data.username[0].toUpperCase();
       if (data.avatarColor) color = data.avatarColor;
+      if (data.avatarText) text = data.avatarText.toUpperCase();
     }
   } catch (err) {
     console.error("[loadAccountBadge]", err);
   }
 
-  badge.textContent = username;
+  badge.textContent = text;
   badge.style.background = color;
 }
+// アカウントタブでプロフィールを保存した直後、ヘッダーのアイコンにも即座に反映するための公開関数
+YNQ.refreshAccountBadge = () => YNQ.currentUser && loadAccountBadge(YNQ.currentUser);
 
 // タブ(tabs/*.html)を読み込んだ直後に呼び出す初期化関数の対応表。
 // fetchしたHTML断片内の<script>はブラウザの仕様上自動実行されないため、

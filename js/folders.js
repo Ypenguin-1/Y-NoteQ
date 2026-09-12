@@ -11,7 +11,7 @@ window.FoldersTab = (function () {
   const ITEM_COLORS = ["#F2CF00", "#2a8cef", "#72ef2a", "#fa6c19", "#ff4e4d", "#a855f7", "#0ea5e9", "#22c55e"];
 
   // 編集モーダルの状態(新規作成中 or 既存アイテム編集中)
-  let editState = { mode: "folder", id: null, color: ITEM_COLORS[0] };
+  let editState = { mode: "folder", id: null, color: ITEM_COLORS[0], description: "" };
 
   function uid() { return YNQ.currentUser && YNQ.currentUser.uid; }
   function foldersCol() { return YNQ.db.collection("users").doc(uid()).collection("folders"); }
@@ -47,8 +47,9 @@ window.FoldersTab = (function () {
         grid.innerHTML = emptyStateHtml("フォルダーがまだありません", "右上の「+ 新規フォルダー」から作成してください", "fa-folder-open");
         return;
       }
-      grid.innerHTML = folders.map(itemCardHtml).join("");
+      grid.innerHTML = folders.map(f => itemCardHtml(f, "folder")).join("");
       folders.forEach(f => bindCardEvents(grid, f, "folder"));
+      loadFolderCounts(folders); // 仕様#8: フォルダーカードに中の単語帳数を表示する
     } catch (err) {
       console.error("[folders:renderFolders]", err);
       grid.innerHTML = emptyStateHtml("読み込みに失敗しました", err.message, "fa-triangle-exclamation");
@@ -116,29 +117,51 @@ window.FoldersTab = (function () {
     }));
   }
 
+  // 各フォルダーの中の単語帳数を集計し、カードに表示する(仕様#8)
+  async function loadFolderCounts(folders) {
+    await Promise.all(folders.map(async (f) => {
+      const el = document.querySelector(`.item-card-count[data-count-folder-id="${CSS.escape(f.id)}"]`);
+      if (!el) return;
+      try {
+        const snap = await booksCol(f.id).get();
+        el.innerHTML = `<i class="fa-solid fa-book"></i> ${snap.size}単語帳`;
+      } catch (err) {
+        console.error("[folders:loadFolderCounts]", err);
+        el.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> 取得失敗`;
+      }
+    }));
+  }
+
   function emptyStateHtml(title, body, icon) {
     return `<div class="empty-state"><i class="fa-solid ${icon}"></i><h3>${YNQ.escapeHtml(title)}</h3><p>${YNQ.escapeHtml(body)}</p></div>`;
   }
 
+  // 仕様修正2026/09/12 No.8: 小さいブロック→正方形のブロックに変更し、
+  // 名前・説明(任意)・件数(フォルダー→単語帳数 / 単語帳→単語数)を表示する。
   function itemCardHtml(item, kind) {
     const icon = kind === "book" ? "fa-book" : "fa-folder";
     const color = item.color || ITEM_COLORS[0];
+    const desc = item.description ? YNQ.escapeHtml(item.description) : "";
+    // フォルダーカードのみ、下段に「中の単語帳数」の差し込み枠を追加する(単語帳側はitem-progressの件数表示で兼ねる)
+    const countRow = kind === "folder"
+      ? `<div class="item-card-count" data-count-folder-id="${item.id}"><i class="fa-solid fa-spinner fa-spin"></i></div>`
+      : "";
     // 単語帳カードのみ、下段にLevel別ミニ進捗バーの差し込み枠を追加する(仕様#4)
     const progressRow = kind === "book"
       ? `<div class="item-progress" data-book-id="${item.id}"><span class="item-progress-loading">読み込み中...</span></div>`
       : "";
     return `
       <div class="item-card" data-id="${item.id}">
-        <div class="item-card-row">
-          <button type="button" class="item-card-body" data-action="open">
-            <i class="fa-solid ${icon} item-card-icon" style="color:${color}"></i>
-            <span class="item-card-name">${YNQ.escapeHtml(item.name)}</span>
-          </button>
-          <div class="item-card-actions">
-            <button type="button" class="btn-icon" data-action="edit" title="編集"><i class="fa-solid fa-pen"></i></button>
-            <button type="button" class="btn-icon" data-action="delete" title="削除"><i class="fa-solid fa-trash"></i></button>
-          </div>
+        <div class="item-card-actions">
+          <button type="button" class="btn-icon" data-action="edit" title="編集"><i class="fa-solid fa-pen"></i></button>
+          <button type="button" class="btn-icon" data-action="delete" title="削除"><i class="fa-solid fa-trash"></i></button>
         </div>
+        <button type="button" class="item-card-body" data-action="open">
+          <i class="fa-solid ${icon} item-card-icon" style="color:${color}"></i>
+          <span class="item-card-name">${YNQ.escapeHtml(item.name)}</span>
+          <p class="item-card-desc">${desc}</p>
+          ${countRow}
+        </button>
         ${progressRow}
       </div>`;
   }
@@ -174,12 +197,13 @@ window.FoldersTab = (function () {
   }
 
   function openEditModal(kind, item) {
-    editState = { mode: kind, id: item ? item.id : null, color: (item && item.color) || ITEM_COLORS[0] };
+    editState = { mode: kind, id: item ? item.id : null, color: (item && item.color) || ITEM_COLORS[0], description: (item && item.description) || "" };
     document.getElementById("item-edit-title").textContent = item
       ? (kind === "folder" ? "フォルダーを編集" : "単語帳を編集")
       : (kind === "folder" ? "新規フォルダー" : "新規単語帳");
     document.getElementById("item-edit-name").value = item ? item.name : "";
     document.getElementById("item-edit-name-error").textContent = "";
+    document.getElementById("item-edit-desc").value = editState.description;
     renderColorSwatches();
     YNQ.openModal("modal-item-edit");
     document.getElementById("item-edit-name").focus();
@@ -204,6 +228,7 @@ window.FoldersTab = (function () {
   async function saveItem() {
     const nameInput = document.getElementById("item-edit-name");
     const name = nameInput.value.trim();
+    const description = document.getElementById("item-edit-desc").value.trim();
     const errorEl = document.getElementById("item-edit-name-error");
     if (!name) { errorEl.textContent = "名前を入力してください。"; return; }
     errorEl.textContent = "";
@@ -214,12 +239,12 @@ window.FoldersTab = (function () {
       const col = editState.mode === "folder" ? foldersCol() : booksCol(YNQ.currentFolder.id);
       if (editState.id) {
         await col.doc(editState.id).update({
-          name, color: editState.color,
+          name, description, color: editState.color,
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       } else {
         await col.add({
-          name, color: editState.color,
+          name, description, color: editState.color,
           order: Date.now(),
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
