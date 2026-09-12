@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!-- プレースホルダー画像(仕様追加2026/09/12 ランク制度)。本番用の画像が届いたら同じファイル名で差し替えてください。 -->
+
+  <polygon points="60,10 72,42 106,42 78,62 90,96 60,76 30,96 42,62 14,42 48,42"
+           fill="#f2cf00" stroke="#1a1a2e" stroke-width="3"/>
+  <text x="60" y="112" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" font-weight="700" fill="#1a1a2e">VERITAS</text>
+
+</svg>

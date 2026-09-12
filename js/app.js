@@ -827,6 +827,110 @@ function confirmDialog(message, onConfirm, okLabel = "削除する", danger = tr
 
 
 /* ----------------------------------------------------------
+   7.6 ランク制度: ログインボーナス(仕様追加2026/09/12 No.4-D)
+   ---------------------------------------------------------- */
+
+// ピーク(最高到達)ランクを必要なら更新する共通処理(仕様R: ランク履歴表示用)。
+// updateDataオブジェクトに直接 peakRank/peakRankAt を追記する(呼び出し側でset/updateする想定)。
+function maybeUpdatePeakRank(updateData, peakRank, newRank) {
+  const isSame = peakRank && peakRank.tier === newRank.tier && peakRank.division === newRank.division;
+  if (!isSame && YNQ_RANK.isRankHigherOrEqual(newRank, peakRank)) {
+    updateData.peakRank = { tier: newRank.tier, division: newRank.division };
+    updateData.peakRankAt = firebase.firestore.FieldValue.serverTimestamp();
+  }
+}
+YNQ.maybeUpdatePeakRank = maybeUpdatePeakRank;
+
+function todayYmd() {
+  const d = new Date();
+  return `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`;
+}
+
+// 仕様D: ログインすると1日1回、ライトランク帯10pt/高ランク帯5ptを付与する(0:00リセット)。
+// ランクがまだ付いていない(Unranked)間は対象外(仕様A参照)。
+async function applyDailyLoginBonusIfNeeded(user) {
+  const userRef = db.collection("users").doc(user.uid);
+  try {
+    const doc = await userRef.get();
+    if (!doc.exists) return;
+    const data = doc.data();
+    const rank = data.rank;
+    if (!rank || rank.tier === "Unranked") return;
+
+    const today = todayYmd();
+    if (data.lastLoginBonusDate === today) return; // 本日分はすでに付与済み
+
+    const bonus = YNQ_RANK.tierBand(rank.tier) === "light" ? 10 : 5; // 仕様D(ライト帯10pt/高ランク帯5pt)
+    const newRank = YNQ_RANK.applyRankPointsDelta(rank, bonus);
+    const updateData = { rank: newRank, lastLoginBonusDate: today };
+    maybeUpdatePeakRank(updateData, data.peakRank, newRank);
+    await userRef.set(updateData, { merge: true });
+    showToast(`ログインボーナス +${bonus}pt`);
+  } catch (err) {
+    console.error("[applyDailyLoginBonusIfNeeded]", err);
+  }
+}
+
+/* ----------------------------------------------------------
+   7.7 ランク制度: 奇数月末デモーション・ランク履歴(仕様追加2026/09/12 No.4-Q,R)
+   ※このアプリはサーバー側のスケジュール実行(cron等)を持たないため、あくまで
+     「ユーザーがアプリを開いたタイミングで、前回チェック以降に奇数月末23:59を
+     またいでいないか」をその都度確認する形の簡易実装になっている。
+   ---------------------------------------------------------- */
+const SEASON_DEMOTION_TARGET_TIERS = ["Diamond", "Master", "Veritas"]; // 仕様Q
+
+async function applySeasonalRankCheckIfNeeded(user) {
+  const userRef = db.collection("users").doc(user.uid);
+  try {
+    const doc = await userRef.get();
+    if (!doc.exists) return;
+    const data = doc.data();
+    const rank = data.rank;
+    const now = new Date();
+    const lastCheck = (data.lastSeasonCheckAt && data.lastSeasonCheckAt.toDate) ? data.lastSeasonCheckAt.toDate() : now;
+
+    if (!rank || !SEASON_DEMOTION_TARGET_TIERS.includes(rank.tier)) {
+      // 対象ランクでなくても、次回チェックの起点として今回のログイン時刻は保存しておく
+      await userRef.set({ lastSeasonCheckAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      return;
+    }
+
+    const boundaries = YNQ_RANK.countOddMonthEndBoundariesCrossed(lastCheck, now);
+    if (boundaries <= 0) {
+      await userRef.set({ lastSeasonCheckAt: firebase.firestore.FieldValue.serverTimestamp() }, { merge: true });
+      return;
+    }
+
+    // 仕様Q: 対象タイミングを1回またぐごとにランクを2段階下げる(長期間未ログインで複数回分を一度に処理する場合もある)
+    let currentRank = rank;
+    let peakRank = data.peakRank;
+    let peakRankAt = data.peakRankAt || now;
+    const historyEntries = [];
+    for (let i = 0; i < boundaries; i++) {
+      if (!SEASON_DEMOTION_TARGET_TIERS.includes(currentRank.tier)) break; // 降格して対象外になったら打ち切り
+      // 仕様R: 降格前にその期間の最高到達ランクと到達日時を履歴に残す
+      historyEntries.push({ rank: peakRank || currentRank, achievedAt: peakRankAt, demotedAt: now });
+      currentRank = YNQ_RANK.demoteRankBySteps(currentRank, 2);
+      peakRank = { tier: currentRank.tier, division: currentRank.division };
+      peakRankAt = now;
+    }
+
+    const batch = db.batch();
+    batch.set(userRef, {
+      rank: currentRank,
+      peakRank, peakRankAt,
+      lastSeasonCheckAt: firebase.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+    historyEntries.forEach(entry => batch.set(userRef.collection("rankHistory").doc(), entry));
+    await batch.commit();
+    showToast(`定期デモーションにより ${YNQ_RANK.rankLabel(currentRank)} に降格しました`);
+  } catch (err) {
+    console.error("[applySeasonalRankCheckIfNeeded]", err);
+  }
+}
+
+
+/* ----------------------------------------------------------
    8. 認証状態の監視(ログイン/ログアウトで画面を切り替える)
    ---------------------------------------------------------- */
 
@@ -837,6 +941,8 @@ auth.onAuthStateChanged((user) => {
     document.getElementById("screen-register").hidden = true;
     document.getElementById("app-shell").hidden = false;
     loadAccountBadge(user);
+    applyDailyLoginBonusIfNeeded(user); // 仕様D
+    applySeasonalRankCheckIfNeeded(user); // 仕様Q
     loadTab("home"); // タブバー自体の表示/非表示は renderTab 側で制御する
   } else {
     document.getElementById("app-shell").hidden = true;

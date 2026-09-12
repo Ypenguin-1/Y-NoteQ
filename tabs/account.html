@@ -42,6 +42,36 @@
     </div>
   </section>
 
+  <!-- 仕様追加2026/09/12(ランク制度): ランク欄 -->
+  <section class="panel">
+    <h2 class="panel-title"><i class="fa-solid fa-ranking-star"></i> ランク</h2>
+    <div class="rank-summary" id="rank-summary">
+      <div class="rank-badge-wrap">
+        <img src="assets/ranks/Batch_Unranked.svg" alt="" id="rank-badge-img" class="rank-badge-img">
+      </div>
+      <div class="rank-summary-info">
+        <div class="rank-summary-name" id="rank-summary-name">読み込み中...</div>
+        <div class="rank-progress-bar" id="rank-progress-bar" hidden>
+          <div class="rank-progress-fill" id="rank-progress-fill" style="width:0%;"></div>
+        </div>
+        <div class="rank-summary-points" id="rank-summary-points"></div>
+      </div>
+    </div>
+    <button type="button" class="patch-history-toggle" id="btn-toggle-rank-history">
+      過去のランク履歴を見る <i class="fa-solid fa-chevron-down"></i>
+    </button>
+    <div id="rank-history" class="patch-history" hidden>
+      <div class="table-scroll">
+        <table class="word-table">
+          <thead><tr><th>期間中の最高ランク</th><th>到達日時</th><th>降格日時</th></tr></thead>
+          <tbody id="rank-history-body">
+            <tr><td colspan="3" style="text-align:center;color:var(--color-text-muted);padding:16px;">まだ履歴がありません</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
   <section class="panel">
     <h2 class="panel-title"><i class="fa-solid fa-chart-simple"></i> 個人Level <small style="font-weight:400;color:var(--color-text-muted);">(全フォルダー・全単語帳の合計)</small></h2>
     <div class="analytics-bar" id="account-level-bar"></div>
@@ -54,9 +84,9 @@
     <h2 class="panel-title"><i class="fa-solid fa-clock-rotate-left"></i> テスト実施記録 <span class="panel-title-count">(直近20件)</span></h2>
     <div class="table-scroll">
       <table class="word-table">
-        <thead><tr><th>日時</th><th>単語帳</th><th>形式</th><th>正答率</th></tr></thead>
+        <thead><tr><th>日時</th><th>単語帳</th><th>形式</th><th>正答率</th><th>獲得ポイント</th></tr></thead>
         <tbody id="account-test-history-body">
-          <tr><td colspan="4" style="text-align:center;color:var(--color-text-muted);padding:20px;">読み込み中...</td></tr>
+          <tr><td colspan="5" style="text-align:center;color:var(--color-text-muted);padding:20px;">読み込み中...</td></tr>
         </tbody>
       </table>
     </div>
