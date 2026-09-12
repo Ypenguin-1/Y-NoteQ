@@ -810,13 +810,18 @@ function closeMobileMenu() {
   document.getElementById("mobile-menu").hidden = true;
 }
 
-// 汎用の削除確認ダイアログ(Phase2以降のフォルダー/単語帳削除などから呼び出す想定)
-function confirmDialog(message, onConfirm) {
+// 汎用の確認ダイアログ(削除/リセット/インストールなど様々な操作から呼び出す)。
+// 仕様修正2026/09/12 No.3-4: OKボタンの文言が常に「削除する」固定だったため、
+// 呼び出し側で操作に応じた文言(例: 「リセットする」「インストールする」)と危険度を指定できるようにする。
+function confirmDialog(message, onConfirm, okLabel = "削除する", danger = true) {
   document.getElementById("confirm-message").textContent = message;
   openModal("modal-confirm");
   const okBtn = document.getElementById("btn-confirm-ok");
   const newOkBtn = okBtn.cloneNode(true); // 直前のリスナーを消すため差し替える
   okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+  newOkBtn.textContent = okLabel;
+  newOkBtn.classList.toggle("btn-danger", danger);
+  newOkBtn.classList.toggle("btn-primary", !danger);
   newOkBtn.addEventListener("click", () => { closeModal("modal-confirm"); onConfirm(); });
 }
 

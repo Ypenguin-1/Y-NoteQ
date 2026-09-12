@@ -191,7 +191,7 @@ window.EditTab = (function () {
           console.error("[edit:handleImportFile:commit]", err);
           YNQ.showToast("インポートに失敗しました");
         }
-      });
+      }, "インポートする", false);
     } catch (err) {
       console.error("[edit:handleImportFile]", err);
       YNQ.showToast("ファイルの読み込みに失敗しました。CSV/Excel形式をご確認ください");
@@ -225,7 +225,7 @@ window.EditTab = (function () {
         console.error("[edit:bulkApplyLevel]", err);
         YNQ.showToast("一括変更に失敗しました");
       }
-    });
+    }, "変更する", false);
   }
 
   function bulkDelete() {
@@ -240,7 +240,7 @@ window.EditTab = (function () {
         console.error("[edit:bulkDelete]", err);
         YNQ.showToast("一括削除に失敗しました");
       }
-    });
+    }, "削除する", true);
   }
 
   /* ---------- ④単語ごとの修正・リセット・削除 ---------- */
@@ -303,7 +303,7 @@ window.EditTab = (function () {
         console.error("[edit:resetWord]", err);
         YNQ.showToast("リセットに失敗しました");
       }
-    });
+    }, "リセットする", false);
   }
 
   function deleteWord(wordId) {
@@ -318,7 +318,7 @@ window.EditTab = (function () {
         console.error("[edit:deleteWord]", err);
         YNQ.showToast("削除に失敗しました");
       }
-    });
+    }, "削除する", true);
   }
 
   return { init };

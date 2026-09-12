@@ -117,8 +117,11 @@ window.ShareTab = (function () {
       }
       grid.innerHTML = sharedList.map(sharedCardHtml).join("");
       sharedList.forEach(s => {
-        const btn = grid.querySelector(`[data-install-id="${CSS.escape(s.id)}"]`);
-        if (btn) btn.addEventListener("click", () => installSharedBook(s));
+        const installBtn = grid.querySelector(`[data-install-id="${CSS.escape(s.id)}"]`);
+        if (installBtn) installBtn.addEventListener("click", () => installSharedBook(s));
+        // 仕様修正2026/09/12 No.3-3: 投稿者本人のみ「共有を中止」できる
+        const unshareBtn = grid.querySelector(`[data-unshare-id="${CSS.escape(s.id)}"]`);
+        if (unshareBtn) unshareBtn.addEventListener("click", () => unshareBook(s));
       });
     } catch (err) {
       console.error("[share:loadSharedList]", err);
@@ -128,6 +131,7 @@ window.ShareTab = (function () {
 
   function sharedCardHtml(s) {
     const desc = s.description ? YNQ.escapeHtml(s.description) : "";
+    const isOwner = YNQ.currentUser && s.authorUid === YNQ.currentUser.uid;
     return `
       <div class="item-card shared-card">
         <div class="shared-card-header">
@@ -139,7 +143,10 @@ window.ShareTab = (function () {
           <span><i class="fa-solid fa-book"></i> ${s.wordCount || 0}単語</span>
           <span><i class="fa-solid fa-user"></i> ${YNQ.escapeHtml(s.authorName || "不明")}</span>
         </div>
-        <button type="button" class="btn btn-primary btn-block" data-install-id="${s.id}"><i class="fa-solid fa-download"></i> インストール</button>
+        <div class="shared-card-actions">
+          <button type="button" class="btn btn-primary btn-block" data-install-id="${s.id}"><i class="fa-solid fa-download"></i> インストール</button>
+          ${isOwner ? `<button type="button" class="btn btn-secondary btn-block" data-unshare-id="${s.id}"><i class="fa-solid fa-ban"></i> 共有を中止</button>` : ""}
+        </div>
       </div>`;
   }
 
@@ -172,7 +179,25 @@ window.ShareTab = (function () {
         console.error("[share:installSharedBook]", err);
         YNQ.showToast("インストールに失敗しました");
       }
-    });
+    }, "インストールする", false);
+  }
+
+  // 仕様修正2026/09/12 No.3-3: 投稿者本人が共有を中止(削除)できるようにする
+  function unshareBook(shared) {
+    YNQ.confirmDialog(`「${shared.name}」の共有を中止しますか?\n共有一覧から削除され、他のユーザーはインストールできなくなります(すでにインストール済みの単語帳には影響しません)。`, async () => {
+      try {
+        // firestore.rulesの仕様上、サブコレクションのwordsは親ドキュメントが存在する間しか
+        // authorUidの照合ができないため、先にwordsを削除し、最後に親ドキュメントを削除する
+        const wordsSnap = await sharedCol().doc(shared.id).collection("words").get();
+        await Promise.all(wordsSnap.docs.map(d => d.ref.delete()));
+        await sharedCol().doc(shared.id).delete();
+        YNQ.showToast("共有を中止しました");
+        loadSharedList();
+      } catch (err) {
+        console.error("[share:unshareBook]", err);
+        YNQ.showToast("共有の中止に失敗しました");
+      }
+    }, "共有を中止する", true);
   }
 
   // 「共有された単語帳」という名前の専用フォルダーを取得する(なければ新規作成する)
