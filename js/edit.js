@@ -144,14 +144,52 @@ window.EditTab = (function () {
   }
 
   /* ---------- ②CSV / Excel インポート ---------- */
+  // RFC4180準拠の簡易CSVパーサー(ダブルクォートで囲まれたフィールド内の改行・カンマ・
+  // ""エスケープに対応)。仕様修正2026/09/12 No.5-1: CSVはXLSX.readに任せず自前でパースし、
+  // セル内の改行情報(単語・意味に含まれる複数行のテキスト)を確実に保持する。
+  function parseCsvText(text) {
+    if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1); // 先頭のBOMを除去
+    const rows = [];
+    let row = [], field = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') {
+          if (text[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+        } else {
+          field += c;
+        }
+      } else if (c === '"') {
+        inQuotes = true;
+      } else if (c === ",") {
+        row.push(field); field = "";
+      } else if (c === "\r") {
+        // 無視(\r\nの\rはスキップし、\nの方で改行を確定する)
+      } else if (c === "\n") {
+        row.push(field); rows.push(row); row = []; field = "";
+      } else {
+        field += c;
+      }
+    }
+    if (field.length > 0 || row.length > 0) { row.push(field); rows.push(row); }
+    return rows;
+  }
+
   async function handleImportFile(e) {
     const file = e.target.files[0];
     if (!file) return;
     try {
-      const data = await file.arrayBuffer();
-      const wb = XLSX.read(data, { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      const isCsv = /\.csv$/i.test(file.name);
+      let rows;
+      if (isCsv) {
+        const text = await file.text();
+        rows = parseCsvText(text);
+      } else {
+        const data = await file.arrayBuffer();
+        const wb = XLSX.read(data, { type: "array" });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+      }
       const dataRows = rows.slice(1); // 仕様#87: 1行目は見出しなので2行目から
 
       const parsed = [];
@@ -185,6 +223,7 @@ window.EditTab = (function () {
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
           });
+          if (isCsv) await renameCurrentBookFromFileName(file.name); // 仕様修正2026/09/12 No.5-3
           YNQ.showToast(`${parsed.length}件をインポートしました`);
           await loadWords();
         } catch (err) {
@@ -197,6 +236,23 @@ window.EditTab = (function () {
       YNQ.showToast("ファイルの読み込みに失敗しました。CSV/Excel形式をご確認ください");
     } finally {
       e.target.value = ""; // 同じファイルを連続選択しても change が発火するようにリセット
+    }
+  }
+
+  // 仕様修正2026/09/12 No.5-3: CSVインポート時、ファイル名(拡張子除く)を単語帳名として反映する
+  async function renameCurrentBookFromFileName(fileName) {
+    const name = fileName.replace(/\.csv$/i, "").trim();
+    if (!name) return;
+    try {
+      const bookRef = YNQ.db.collection("users").doc(YNQ.currentUser.uid)
+        .collection("folders").doc(YNQ.currentFolder.id)
+        .collection("wordbooks").doc(YNQ.currentBook.id);
+      await bookRef.update({ name, updatedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      YNQ.currentBook.name = name;
+      const titleEl = document.getElementById("header-booktitle");
+      if (titleEl) titleEl.textContent = name;
+    } catch (err) {
+      console.error("[edit:renameCurrentBookFromFileName]", err);
     }
   }
 

@@ -175,6 +175,11 @@
     <section class="panel test-result-summary">
       <h2 class="panel-title"><i class="fa-solid fa-trophy"></i> 結果</h2>
       <div class="test-result-score" id="test-result-score"></div>
+      <!-- 仕様追加2026/09/12 No.5-4: 獲得ポイントの内訳(ランクなしの間は非表示) -->
+      <button type="button" class="patch-history-toggle" id="btn-toggle-points-breakdown" hidden>
+        ポイントの内訳を見る <i class="fa-solid fa-chevron-down"></i>
+      </button>
+      <div id="points-breakdown" class="patch-history" hidden></div>
       <div class="test-result-actions">
         <button type="button" class="btn btn-primary" id="btn-result-retry">もう一度</button>
         <button type="button" class="btn btn-secondary" id="btn-result-retry-wrong">間違えた・わからない問題のみ</button>

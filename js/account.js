@@ -71,7 +71,8 @@ window.AccountTab = (function () {
       const qualifyingTestCount = data.qualifyingTestCount || 0;
 
       imgEl.src = YNQ_RANK.rankBadgeImagePath(rank);
-      nameEl.textContent = YNQ_RANK.rankLabel(rank);
+      // 仕様追加2026/09/12 No.5-6: 現在の期間ラベル(例: 26-Sum)をランク名の横に表示
+      nameEl.innerHTML = `${YNQ.escapeHtml(YNQ_RANK.rankLabel(rank))} <span class="rank-period-badge">${YNQ_RANK.seasonLabel(new Date())}</span>`;
 
       if (rank.tier === "Unranked") {
         barWrap.hidden = true;
@@ -84,11 +85,11 @@ window.AccountTab = (function () {
       if (max === null) {
         // Veritasは上限なし(仕様: 200pt maxとせず上限を設定しない)
         barWrap.hidden = true;
-        pointsEl.textContent = `${rank.points}pt(${band}・上限なし)`;
+        pointsEl.textContent = `${rank.points.toFixed(1)}pt(${band}・上限なし)`;
       } else {
         barWrap.hidden = false;
         barFill.style.width = `${Math.max(0, Math.min(100, (rank.points / max) * 100))}%`;
-        pointsEl.textContent = `${rank.points} / ${max}pt(${band})`;
+        pointsEl.textContent = `${rank.points.toFixed(1)} / ${max}pt(${band})`;
       }
     } catch (err) {
       console.error("[account:loadRankSummary]", err);
@@ -97,25 +98,28 @@ window.AccountTab = (function () {
   }
 
   // 仕様R: 奇数月末デモーション(仕様Q)で降格した際の、期間中の最高ランクと到達日時の履歴
+  // 仕様修正2026/09/12 No.5-7: 同じ期間内はランク推移(昇格するたび)を複数件表示し、
+  // 期間が終了したものはその期間の最高ランク1件だけに集約されている(集約自体はapp.js側で行う)。
   async function loadRankHistory() {
     const tbody = document.getElementById("rank-history-body");
     tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--color-text-muted);padding:16px;">読み込み中...</td></tr>`;
     try {
       const snap = await YNQ.db.collection("users").doc(YNQ.currentUser.uid)
-        .collection("rankHistory").orderBy("demotedAt", "desc").limit(20).get();
+        .collection("rankHistory").orderBy("achievedAt", "desc").limit(30).get();
       if (snap.empty) {
         tbody.innerHTML = `<tr><td colspan="3" style="text-align:center;color:var(--color-text-muted);padding:16px;">まだ履歴がありません</td></tr>`;
         return;
       }
       tbody.innerHTML = snap.docs.map(d => {
         const r = d.data();
-        const achieved = (r.achievedAt && r.achievedAt.toDate) ? formatDateTime(r.achievedAt.toDate()) : "-";
-        const demoted = (r.demotedAt && r.demotedAt.toDate) ? formatDateTime(r.demotedAt.toDate()) : "-";
+        const achievedDate = (r.achievedAt && r.achievedAt.toDate) ? r.achievedAt.toDate() : null;
+        const achieved = achievedDate ? formatDateTime(achievedDate) : "-";
+        const period = r.period || (achievedDate ? YNQ_RANK.seasonLabel(achievedDate) : "-");
         return `
           <tr>
+            <td>${YNQ.escapeHtml(period)}</td>
             <td>${YNQ.escapeHtml(YNQ_RANK.rankLabel(r.rank))}</td>
             <td>${YNQ.escapeHtml(achieved)}</td>
-            <td>${YNQ.escapeHtml(demoted)}</td>
           </tr>`;
       }).join("");
     } catch (err) {
@@ -287,7 +291,17 @@ window.AccountTab = (function () {
         // 仕様S: ポイント履歴もここから見られるように(ランクなし期間のテストはnullのため「-」表示)
         const pointsCell = (r.pointsEarned === null || r.pointsEarned === undefined)
           ? "-"
-          : `${r.pointsEarned >= 0 ? "+" : ""}${r.pointsEarned}pt`;
+          : `${r.pointsEarned >= 0 ? "+" : ""}${r.pointsEarned.toFixed(1)}pt`; // 仕様修正2026/09/12 No.5-5
+
+        // 仕様修正2026/09/12 No.5-9: ログインボーナスの記録は専用の行として表示する
+        if (r.type === "login") {
+          return `
+            <tr>
+              <td>${YNQ.escapeHtml(date)}</td>
+              <td class="col-word" colspan="3"><i class="fa-solid fa-calendar-check"></i> ログインボーナス</td>
+              <td>${pointsCell}</td>
+            </tr>`;
+        }
         return `
           <tr>
             <td>${YNQ.escapeHtml(date)}</td>
