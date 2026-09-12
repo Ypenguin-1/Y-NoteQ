@@ -169,11 +169,13 @@ window.TestTab = (function () {
     }).join("");
   }
 
-  async function exportSettingsPdf() {
-    if (candidatePool.length === 0) { YNQ.showToast("出力できる単語がありません"); return; }
-    const s = readSettings();
-    const promptField = s.direction === "word2meaning" ? "word" : "meaning";
-    const pool = shuffle(candidatePool.slice()).slice(0, Math.min(s.count, candidatePool.length));
+  // 「問題+解答欄」だけの印刷用PDFを作る共通処理(仕様修正2026/09/12 No.6)。
+  // ・テスト開始前(設定画面): candidatePoolからその場でランダムに抽出した単語で出力する。
+  // ・テスト開始後(実施画面/結果画面): 実際にそのテストで出題された queue をそのまま使うことで、
+  //   「今受けている(受けた)テストと同じ内容」のPDFになるようにする。
+  async function exportBlankTestPdf(pool, direction) {
+    if (pool.length === 0) { YNQ.showToast("出力できる単語がありません"); return; }
+    const promptField = direction === "word2meaning" ? "word" : "meaning";
 
     // 画面外に「問題+解答欄」だけの印刷用テーブルを一時生成してPDF化する
     const rows = pool.map((w, i) => `
@@ -197,11 +199,24 @@ window.TestTab = (function () {
     try {
       await YNQ.exportTableAsPdf(wrap.querySelector("table"), `${YNQ.currentBook.name} - テスト問題`, `${YNQ.currentBook.name}_テスト問題.pdf`);
     } catch (err) {
-      console.error("[test:exportSettingsPdf]", err);
+      console.error("[test:exportBlankTestPdf]", err);
       YNQ.showToast("PDFの作成に失敗しました");
     } finally {
       document.body.removeChild(wrap);
     }
+  }
+
+  // ①設定画面(テスト開始前): その場の条件でランダム抽出してPDF化
+  async function exportSettingsPdf() {
+    const s = readSettings();
+    const pool = shuffle(candidatePool.slice()).slice(0, Math.min(s.count, candidatePool.length));
+    await exportBlankTestPdf(pool, s.direction);
+  }
+
+  // ②③実施画面・結果画面(テスト開始後): 今回実際に出題された queue をそのままPDF化
+  async function exportCurrentTestPdf() {
+    if (!settings || queue.length === 0) { YNQ.showToast("出力できるテストがありません"); return; }
+    await exportBlankTestPdf(queue, settings.direction);
   }
 
   /* ============================================================
@@ -255,6 +270,8 @@ window.TestTab = (function () {
     });
 
     document.getElementById("btn-test-next").addEventListener("click", goToNextQuestion);
+
+    document.getElementById("btn-test-export-pdf-running").addEventListener("click", exportCurrentTestPdf);
 
     document.getElementById("btn-test-abort").addEventListener("click", () => YNQ.openModal("modal-test-abort"));
     document.getElementById("btn-abort-cancel").addEventListener("click", () => YNQ.closeModal("modal-test-abort"));
@@ -574,6 +591,7 @@ window.TestTab = (function () {
       beginRun();
     });
     document.getElementById("btn-result-export-pdf").addEventListener("click", exportResultPdf);
+    document.getElementById("btn-result-export-blank-pdf").addEventListener("click", exportCurrentTestPdf);
 
     // ポップオーバーの外側クリックで閉じる(単語一覧タブ側と共通の要素のため、未登録でもここで保証する)
     document.addEventListener("click", (e) => {

@@ -189,12 +189,12 @@ window.WordlistTab = (function () {
         : YNQ.escapeHtml(w.lastTestDate || "-");
       return `
         <tr data-id="${w.id}">
-          <td>${YNQ.pad4(w.no)}</td>
-          <td class="col-word">${YNQ.escapeHtml(w.word)}</td>
-          <td class="col-meaning">${YNQ.escapeHtml(w.meaning)}</td>
-          <td>${dateCell}</td>
-          <td><button type="button" class="level-pill" style="background:${YNQ.LEVEL_COLORS[level]}" data-action="level" data-id="${w.id}">${level}</button></td>
-          <td>
+          <td data-label="単語No.">${YNQ.pad4(w.no)}</td>
+          <td class="col-word" data-label="単語">${YNQ.escapeHtml(w.word)}</td>
+          <td class="col-meaning" data-label="意味">${YNQ.escapeHtml(w.meaning)}</td>
+          <td data-label="実施日">${dateCell}</td>
+          <td data-label="暗記度"><button type="button" class="level-pill" style="background:${YNQ.LEVEL_COLORS[level]}" data-action="level" data-id="${w.id}">${level}</button></td>
+          <td data-label="操作">
             <div class="row-actions">
               <button type="button" class="btn btn-secondary" data-action="detail" data-id="${w.id}">詳細</button>
               <button type="button" class="btn btn-secondary" data-action="reset" data-id="${w.id}">リセット</button>
