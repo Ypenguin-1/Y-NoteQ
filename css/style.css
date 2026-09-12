@@ -1118,7 +1118,7 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
 /* 仕様追加2026/09/12 No.5-6: ランクの現在期間ラベル(例: 26-Sum) */
 .rank-period-badge {
   display: inline-block;
-  font-size: 11px;
+  font-size: 15px;
   font-weight: 700;
   font-family: var(--font-en);
   padding: 2px 8px;
