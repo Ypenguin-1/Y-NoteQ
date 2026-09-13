@@ -61,7 +61,7 @@ img { max-width: 100%; display: block; }
   --color-shadow: rgba(0, 0, 0, 0.08);
   --color-overlay: rgba(20, 20, 15, 0.55);
   --color-danger: #e5484d;
-  --color-success: #2fb344;
+  --color-success: #85C800; /* 仕様修正2026/09/13 No.3-2: 「正解」表示の色を統一 */
   /* ネイティブフォームパーツ(カレンダーアイコン等)をテーマに追従させる(仕様修正2026/09/12 No.10) */
   color-scheme: light;
 }
@@ -79,7 +79,7 @@ img { max-width: 100%; display: block; }
     --color-shadow: rgba(0, 0, 0, 0.5);
     --color-overlay: rgba(0, 0, 0, 0.65);
     --color-danger: #ff6b6b;
-    --color-success: #4fd06a;
+    --color-success: #85C800; /* 仕様修正2026/09/13 No.3-2 */
     color-scheme: dark;
   }
 }
@@ -96,7 +96,7 @@ img { max-width: 100%; display: block; }
   --color-shadow: rgba(0, 0, 0, 0.5);
   --color-overlay: rgba(0, 0, 0, 0.65);
   --color-danger: #ff6b6b;
-  --color-success: #4fd06a;
+  --color-success: #85C800; /* 仕様修正2026/09/13 No.3-2 */
   color-scheme: dark;
 }
 
@@ -598,9 +598,33 @@ body {
 .patch-entry:first-child { padding-top: 0; }
 .patch-entry:last-child { border-bottom: none; }
 .patch-entry .patch-meta { font-size: 12px; color: var(--color-text-muted); font-family: var(--font-en); margin-bottom: 6px; }
-/* 仕様追加2026/09/12 No.5-4: テスト結果のポイント内訳(ラベルと数値を左右に並べる) */
-#points-breakdown .patch-entry { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; font-size: 13px; }
 .patch-entry ul { padding-left: 18px; list-style: disc; font-size: 13px; line-height: 1.7; }
+
+/* 仕様修正2026/09/13 No.3-4: テスト結果のポイント内訳(項目=左寄せ・計算(pt)=右寄せ、
+   一番下に「ひっ算」のような合計行) */
+.points-breakdown-cat { padding: 10px 0; border-bottom: 1px solid var(--color-border); text-align: left; }
+.points-breakdown-cat-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+.points-breakdown-line {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 2px 0 2px 10px;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+.points-breakdown-line strong { color: var(--color-text); font-weight: 700; white-space: nowrap; }
+.points-breakdown-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 4px;
+  padding-top: 12px;
+  border-top: 2px solid var(--color-text);
+  font-size: 15px;
+  font-weight: 800;
+}
 .patch-history-toggle {
   width: 100%;
   margin-top: 6px;
@@ -1079,6 +1103,40 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
 .test-result-score { font-size: 40px; font-weight: 800; color: var(--color-primary-dark); margin-bottom: 18px; }
 .test-result-score small { display: block; font-size: 14px; font-weight: 600; color: var(--color-text-muted); margin-top: 4px; }
 .test-result-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+
+/* 仕様追加2026/09/13 No.3-3: 結果画面のランク/ポイント推移(アニメーション付き) */
+.test-result-rank {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  text-align: left;
+  background: var(--color-bg-elevated);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin: 0 0 18px;
+}
+.test-result-rank-badge-wrap { flex-shrink: 0; width: 52px; height: 52px; }
+.test-result-rank-badge { width: 100%; height: 100%; object-fit: contain; transition: transform .2s ease; }
+.test-result-rank-badge-pop { animation: test-result-badge-pop .5s ease; }
+@keyframes test-result-badge-pop {
+  0% { transform: scale(0.6) rotate(-8deg); opacity: 0; }
+  60% { transform: scale(1.15) rotate(4deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); }
+}
+.test-result-rank-info { flex: 1; min-width: 0; }
+.test-result-rank-name { font-size: 15px; font-weight: 800; margin-bottom: 6px; }
+.test-result-rank-change {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--color-primary);
+  color: var(--color-primary-contrast);
+}
+.test-result-rank-change.is-demoted { background: var(--color-danger); color: #fff; }
+.test-result-rank-points { font-size: 12px; color: var(--color-text-muted); margin-top: 4px; }
 
 .judge-badge { padding: 3px 10px; border-radius: var(--radius-sm); font-size: 12px; font-weight: 700; }
 .judge-correct { background: var(--color-success); color: #fff; }
