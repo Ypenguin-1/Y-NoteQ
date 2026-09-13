@@ -22,6 +22,7 @@ window.FoldersTab = (function () {
   /* ---------- 初期表示 ---------- */
   function init() {
     bindStaticEvents();
+    applyViewModeUI();
     render();
   }
 
@@ -31,6 +32,18 @@ window.FoldersTab = (function () {
     } else {
       renderFolders();
     }
+  }
+
+  // 仕様追加2026/09/13 No.1-5: 正方形カード表示/一覧表示の切り替え(選択状態はlocalStorageに保存)
+  function currentViewMode() {
+    return localStorage.getItem("ynoteq-folders-view") === "list" ? "list" : "grid";
+  }
+  function applyViewModeUI() {
+    const mode = currentViewMode();
+    document.getElementById("folders-grid").classList.toggle("list-view", mode === "list");
+    document.querySelectorAll("#folders-view-toggle [data-view]").forEach(btn => {
+      btn.classList.toggle("active", btn.dataset.view === mode);
+    });
   }
 
   /* ---------- フォルダー一覧(トップ階層) ---------- */
@@ -150,9 +163,14 @@ window.FoldersTab = (function () {
     const progressRow = kind === "book"
       ? `<div class="item-progress" data-book-id="${item.id}"><span class="item-progress-loading">読み込み中...</span></div>`
       : "";
+    // 仕様追加2026/09/13 No.1-15: 単語帳カードには「共有」タブへ移動するアイコンも設置する
+    const shareBtn = kind === "book"
+      ? `<button type="button" class="btn-icon" data-action="share" title="共有する"><i class="fa-solid fa-share-nodes"></i></button>`
+      : "";
     return `
       <div class="item-card" data-id="${item.id}">
         <div class="item-card-actions">
+          ${shareBtn}
           <button type="button" class="btn-icon" data-action="edit" title="編集"><i class="fa-solid fa-pen"></i></button>
           <button type="button" class="btn-icon" data-action="delete" title="削除"><i class="fa-solid fa-trash"></i></button>
         </div>
@@ -180,6 +198,15 @@ window.FoldersTab = (function () {
     });
     card.querySelector('[data-action="edit"]').addEventListener("click", () => openEditModal(kind, item));
     card.querySelector('[data-action="delete"]').addEventListener("click", () => confirmDelete(kind, item));
+
+    // 仕様追加2026/09/13 No.1-15: 単語帳の「共有」アイコン→共有タブへ移動し、その単語帳を選択しておく
+    const shareBtn = card.querySelector('[data-action="share"]');
+    if (shareBtn) {
+      shareBtn.addEventListener("click", () => {
+        YNQ.shareTargetBook = { folderId: item.folderId, bookId: item.id };
+        YNQ.loadTab("share");
+      });
+    }
   }
 
   /* ---------- 新規作成・編集モーダル ---------- */
@@ -193,6 +220,13 @@ window.FoldersTab = (function () {
     document.getElementById("item-edit-custom-color").addEventListener("input", (e) => {
       editState.color = e.target.value;
       document.querySelectorAll("#item-edit-colors .color-swatch").forEach(b => b.classList.remove("selected"));
+    });
+
+    document.querySelectorAll("#folders-view-toggle [data-view]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        localStorage.setItem("ynoteq-folders-view", btn.dataset.view);
+        applyViewModeUI();
+      });
     });
   }
 

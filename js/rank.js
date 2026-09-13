@@ -148,14 +148,15 @@ window.YNQ_RANK = (function () {
      各ルールの数値はここにまとめてあるので、後で調整したい場合はこの節だけ見ればよい。
      ---------------------------------------------------------- */
   const POINTS_TOUCH_LEVEL0_WORD = 0.1;      // 仕様E: Level0の単語に触れた(テスト方式問わず・正誤問わず)
-  const POINTS_MAINTAIN_LEVEL1 = 1.5;        // 仕様H: Level1を維持(1→1)
+  const POINTS_MAINTAIN_LEVEL1 = 1.0;        // 仕様H: Level1を維持(1→1)(仕様修正2026/09/13 No.1-6: 1.5→1.0)
   const POINTS_MAINTAIN_LEVEL_2TO5 = 0.5;    // 仕様I: Level2〜5を維持(X→X)
-  const POINTS_LEVEL_UP_1 = -1.5;            // 仕様J: Levelが1上がった
+  const POINTS_LEVEL_UP_1 = -1.0;            // 仕様J: Levelが1上がった(仕様修正2026/09/13 No.1-7: -1.5→-1.0)
   const POINTS_LEVEL_DOWN_FROM_2OR3 = 1.0;   // 仕様K: Level2or3から1下がった
-  const POINTS_LEVEL_DOWN_FROM_4OR5 = 2.0;   // 仕様L: Level4or5から1下がった
+  const POINTS_LEVEL_DOWN_FROM_4OR5 = 1.5;   // 仕様L: Level4or5から1下がった(仕様修正2026/09/13 No.1-8: 2.0→1.5)
   const POINTS_PER_10_QUESTIONS = 2.0;       // 仕様M: 10問ごとのボーナス(正答率無関係)
   const POINTS_RECENT_TOUCH_BONUS = 0.2;     // 仕様P: 直近5日以内に触れていた単語(正誤問わず)
   const RECENT_TOUCH_DAYS = 5;               // 仕様P
+  const TYPED_FORMAT_MULTIPLIER = 1.2;       // 仕様修正2026/09/13 No.1-9: 入力記述形式は合計ptを×1.2する
 
   // 仕様N: 正答率に応じたボーナス/ペナルティ(境界値は「以上未満」で判定)
   function accuracyBonusPoints(accPct) {
@@ -195,48 +196,73 @@ window.YNQ_RANK = (function () {
     return Math.round((b - a) / (24 * 60 * 60 * 1000));
   }
 
+  // 内訳1項目分のデータ構造を作る。同じ単価(unit)が複数回かかった場合は1件にまとめて
+  // count を積み上げることで、表示側で「0.1pt × 3」のような表記ができるようにする
+  // (仕様修正2026/09/13 No.1-3)。
+  function mkCategory() { return { total: 0, items: [] }; }
+  function addToCategory(cat, unit, times) {
+    times = times || 1;
+    if (!unit || !times) return;
+    unit = roundPt(unit);
+    let entry = cat.items.find(it => it.unit === unit);
+    if (!entry) { entry = { unit, count: 0 }; cat.items.push(entry); }
+    entry.count += times;
+    cat.total = roundPt(cat.total + unit * times);
+  }
+
   // テスト1回分の獲得ポイントを計算する。
   // answers: [{ levelBefore, levelAfter, isCorrect, prevLastTestDate }]
   //   prevLastTestDate: そのテストで更新される「前」の lastTestDate(仕様P判定用。test.js側で
   //   Firestoreを更新する前の値をここに積んでおいてもらう必要がある)
   // format: "flashcard" | "choice4" | "typed"
-  // levelScoring: 設定画面の「Level採点」がONかどうか(OFFならLevelは変動しないため仕様H〜Lは0扱い)
+  // levelScoring: 設定画面の「Level・ランク採点」がONかどうか。OFFの間はランクpt自体を
+  //   一切与えない(仕様修正2026/09/13 No.1-10)。
   // today: "YYYY/MM/DD" 形式の今日の日付
   function computeTestPoints({ answers, format, levelScoring, today }) {
-    const breakdown = { level0Touch: 0, levelTransition: 0, tenQuestionBonus: 0, accuracyBonus: 0, recentTouchBonus: 0 };
+    const breakdown = {
+      level0Touch: mkCategory(), levelTransition: mkCategory(),
+      tenQuestionBonus: mkCategory(), accuracyBonus: mkCategory(), recentTouchBonus: mkCategory()
+    };
+
+    // 仕様修正2026/09/13 No.1-10: Level・ランク採点がOFFの間はランクptを一切与えない
+    if (!levelScoring) return { total: 0, breakdown };
 
     // 仕様E: Level0の単語に触れた場合は、テスト方式・正誤を問わず常に加算
     (answers || []).forEach(a => {
-      if ((a.levelBefore || 0) === 0) breakdown.level0Touch += POINTS_TOUCH_LEVEL0_WORD;
+      if ((a.levelBefore || 0) === 0) addToCategory(breakdown.level0Touch, POINTS_TOUCH_LEVEL0_WORD);
     });
 
     // 仕様G: ここから先は「単語カード」形式では加算しない
     if (format !== "flashcard") {
-      // 仕様H〜L: LevelScoringがONの時だけ、Levelの維持/変動に応じて加算
-      if (levelScoring) {
-        (answers || []).forEach(a => {
-          breakdown.levelTransition += pointsForLevelTransition(a.levelBefore, a.levelAfter);
-        });
-      }
+      // 仕様H〜L: Levelの維持/変動に応じて加算
+      (answers || []).forEach(a => {
+        addToCategory(breakdown.levelTransition, pointsForLevelTransition(a.levelBefore, a.levelAfter));
+      });
 
       // 仕様M: 出題数10問ごとに+2pt(正答率は無関係)
       const totalQ = (answers || []).length;
-      breakdown.tenQuestionBonus = Math.floor(totalQ / 10) * POINTS_PER_10_QUESTIONS;
+      const tenQuestionCount = Math.floor(totalQ / 10);
+      addToCategory(breakdown.tenQuestionBonus, POINTS_PER_10_QUESTIONS, tenQuestionCount);
 
       // 仕様N: 正答率に応じたボーナス/ペナルティ
       const correct = (answers || []).filter(a => a.isCorrect).length;
       const accPct = totalQ > 0 ? (correct / totalQ) * 100 : 0;
-      breakdown.accuracyBonus = accuracyBonusPoints(accPct);
+      addToCategory(breakdown.accuracyBonus, accuracyBonusPoints(accPct));
 
       // 仕様P: 直近5日以内に触れていた単語は1語につき+0.2pt(正誤問わず)
       (answers || []).forEach(a => {
         if (a.prevLastTestDate && today && daysBetweenYmd(a.prevLastTestDate, today) <= RECENT_TOUCH_DAYS) {
-          breakdown.recentTouchBonus += POINTS_RECENT_TOUCH_BONUS;
+          addToCategory(breakdown.recentTouchBonus, POINTS_RECENT_TOUCH_BONUS);
         }
       });
     }
 
-    const rawTotal = breakdown.level0Touch + breakdown.levelTransition + breakdown.tenQuestionBonus + breakdown.accuracyBonus + breakdown.recentTouchBonus;
+    let rawTotal = breakdown.level0Touch.total + breakdown.levelTransition.total + breakdown.tenQuestionBonus.total
+      + breakdown.accuracyBonus.total + breakdown.recentTouchBonus.total;
+
+    // 仕様修正2026/09/13 No.1-9: テスト形式が「入力記述」の場合は合計ptを×1.2する
+    if (format === "typed") rawTotal *= TYPED_FORMAT_MULTIPLIER;
+
     const total = Math.round(rawTotal * 10) / 10; // 小数第1位までに丸める
     return { total, breakdown };
   }

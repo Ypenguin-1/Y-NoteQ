@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>ランク制度について - Y-NoteQ</title>
+<link rel="icon" type="image/svg+xml" href="assets/Y-pen_icon_Light.svg">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+
+<link rel="stylesheet" href="css/style.css">
+<style>
+  /* このページ専用の簡易レイアウト(index.htmlのアプリ画面とは別に、単体で開ける説明ページ) */
+  .rank-guide-wrap { max-width: 760px; margin: 0 auto; padding: 24px 20px 60px; }
+  .rank-guide-back {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--color-text-muted); text-decoration: none; font-size: 14px; margin-bottom: 16px;
+  }
+  .rank-guide-back:hover { color: var(--color-text); }
+  .rank-guide-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+  .rank-guide-header img { width: 40px; height: 40px; }
+  .rank-guide-header h1 { font-size: 22px; margin: 0; }
+  .rank-guide-wrap .panel { margin-bottom: 16px; }
+  .rank-guide-wrap h2 { font-size: 16px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; }
+  .rank-guide-wrap p, .rank-guide-wrap li { color: var(--color-text); line-height: 1.8; font-size: 14px; }
+  .rank-guide-wrap ul { margin: 0; padding-left: 20px; }
+  .rank-guide-wrap li { margin-bottom: 6px; }
+  .rank-guide-note { color: var(--color-text-muted); font-size: 13px; }
+  .rank-tier-badges { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+  .rank-tier-badges .tier { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 64px; }
+  .rank-tier-badges img { width: 40px; height: 40px; object-fit: contain; }
+  .rank-tier-badges span { font-size: 11px; color: var(--color-text-muted); text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="rank-guide-wrap">
+  <a href="index.html" class="rank-guide-back"><i class="fa-solid fa-arrow-left"></i> Y-NoteQ に戻る</a>
+
+  <div class="rank-guide-header">
+    <img src="assets/ranks/Batch_Diamond_1.svg" alt="">
+    <h1>ランク制度について</h1>
+  </div>
+
+  <section class="panel">
+    <h2><i class="fa-solid fa-layer-group"></i> 階級と段階</h2>
+    <p>
+      テスト(単語カード形式を除く)を合計5回行うと、「Iron Ⅰ」からランクが始まります。
+      ランクは Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Veritas の8階級で、
+      Veritasを除く各階級は Ⅰ・Ⅱ・Ⅲ の3段階に分かれています(Veritasのみ段階なしの最高ランク)。
+    </p>
+    <div class="rank-tier-badges">
+      <div class="tier"><img src="assets/ranks/Batch_Iron_1.svg" alt=""><span>Iron</span></div>
+      <div class="tier"><img src="assets/ranks/Batch_Bronze_1.svg" alt=""><span>Bronze</span></div>
+      <div class="tier"><img src="assets/ranks/Batch_Silver_1.svg" alt=""><span>Silver</span></div>
+      <div class="tier"><img src="assets/ranks/Batch_Gold_1.svg" alt=""><span>Gold</span></div>
+      <div class="tier"><img src="assets/ranks/Batch_Platinum_1.svg" alt=""><span>Platinum</span></div>
+      <div class="tier"><img src="assets/ranks/Batch_Diamond_1.svg" alt=""><span>Diamond</span></div>
+      <div class="tier"><img src="assets/ranks/Batch_Master_1.svg" alt=""><span>Master</span></div>
+      <div class="tier"><img src="assets/ranks/Batch_Veritas.svg" alt=""><span>Veritas</span></div>
+    </div>
+    <p class="rank-guide-note">
+      Iron〜Goldは1段階あたり100ptが上限、Platinum以上は1段階あたり200ptが上限です(Veritasのみ上限なし)。
+      上限を超えて昇格する際、超過分のポイントはそのまま次の段階へ繰り越されます。
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2><i class="fa-solid fa-star"></i> ポイントの獲得方法</h2>
+    <p>ランクがついている間、テストの結果に応じて以下のポイントが加算されます(単語カード形式は暗記度が変動しないため対象外の項目があります)。</p>
+    <ul>
+      <li>Level0の単語に触れた: +0.1pt(形式・正誤を問わず)</li>
+      <li>Level1を維持(1→1): +1.0pt</li>
+      <li>Level2〜5を維持(X→X): +0.5pt</li>
+      <li>Levelが1つ上がった(不正解): -1.0pt</li>
+      <li>Level2または3から1つ下がった: +1.0pt</li>
+      <li>Level4または5から1つ下がった: +1.5pt</li>
+      <li>出題数10問ごとに: +2.0pt(正答率とは無関係)</li>
+      <li>正答率ボーナス/ペナルティ: 100%で+3.0pt、90%以上で+2.0pt、80%以上で+1.5pt、70%以上で+1.0pt、50%以上で+0.5pt、30%未満で-1.0pt</li>
+      <li>直近5日以内に触れていた単語: 1語につき+0.2pt(正誤問わず)</li>
+    </ul>
+    <p class="rank-guide-note">
+      出題形式が「入力記述」の場合は、上記の合計ptに×1.2したものが最終的な獲得ポイントになります。<br>
+      設定画面の「Level・ランク採点」をOFFにしている間は、そのテストで獲得するランクptは常に0になります。<br>
+      また、毎日1回ログインするだけでもボーナスポイントが加算されます。
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2><i class="fa-solid fa-arrow-trend-up"></i> 昇格・降格の仕組み</h2>
+    <p>
+      現在の段階の保有ptが上限に達すると次の段階に昇格します。反対に、保有ptが0を下回りそうになった場合は
+      1回だけ0ptのまま踏みとどまれます(猶予)。すでに猶予を使った状態で再び0pt未満になった場合は
+      1段階降格し、降格後の段階では新しい開始pt(ライト帯=Iron〜Gold: 80pt / 高ランク帯=Platinum以上: 180pt)から
+      再スタートします(Iron Ⅰより下には下がりません)。
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2><i class="fa-solid fa-calendar-days"></i> シーズン(期間)と定期デモーション</h2>
+    <p>
+      ランクの推移は2か月ごとの期間(シーズン)で区切られ、奇数月末日23:59に次の期間へ切り替わります
+      (例: 8〜9月は「Sum」期間)。Diamond以上のランクは、この期間の切り替わりのタイミングで
+      2段階降格します。長期間ログインしていなかった場合は、ログイン時にまとめて判定されます。
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2><i class="fa-solid fa-clock-rotate-left"></i> ランク履歴の見方</h2>
+    <p>
+      アカウントタブの「ランク」欄からは、現在のバッジ・保有pt・期間ラベルに加えて、過去のランク履歴を確認できます。
+      履歴には同じ期間内の昇格がすべて記録され、期間が終了すると、その期間中に到達した最高ランクの1件だけに集約されます。
+    </p>
+  </section>
+</div>
+
+<script>
+  // アプリ本体(js/app.js)のテーマ設定(ライト/ダーク/自動)を、この単体ページにも反映する
+  try {
+    const saved = localStorage.getItem("ynoteq-theme");
+    if (saved === "light" || saved === "dark") document.documentElement.setAttribute("data-theme", saved);
+  } catch (e) { /* localStorageが使えない環境では自動(OS設定)のままにする */ }
+</script>
+</body>
+</html>

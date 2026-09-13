@@ -57,6 +57,16 @@
         </div>
       </div>
 
+      <!-- 仕様追加2026/09/13 No.1-4: 出題順序(ランダム/昇順/降順) -->
+      <div class="field">
+        <label>出題順序</label>
+        <div class="btn-toggle-group" id="test-set-order">
+          <button type="button" class="btn-toggle active" data-value="random">ランダム</button>
+          <button type="button" class="btn-toggle" data-value="asc">昇順(単語No.順)</button>
+          <button type="button" class="btn-toggle" data-value="desc">降順(単語No.逆順)</button>
+        </div>
+      </div>
+
       <div class="field">
         <label>出題形式</label>
         <div class="btn-toggle-group" id="test-set-format">
@@ -75,7 +85,7 @@
       </div>
 
       <div class="field">
-        <label>Level採点 <small>(正解/不正解に応じて暗記度を自動変動させる)</small></label>
+        <label>Level・ランク採点 <small>(正解/不正解に応じて暗記度を自動変動させる(OFFにするとランクptは0になります))</small></label>
         <div class="btn-toggle-group" id="test-set-level-scoring">
           <button type="button" class="btn-toggle active" data-value="on">ON</button>
           <button type="button" class="btn-toggle" data-value="off">OFF</button>

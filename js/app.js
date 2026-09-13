@@ -50,7 +50,8 @@ const HOWTO_CONTENT = [
   { title: "テストで暗記度を上げる", body: "「テスト」タブで出題範囲・出題形式(単語カード/4択/入力記述)などを設定して小テストを開始できます。Level採点をONにすると正誤に応じて暗記度(Level)が自動で変動します。" },
   { title: "単語を編集する", body: "「編集」タブから単語の直接追加、CSV/Excelファイルからの一括インポート、単語ごとの修正・リセット・削除、範囲指定での一括操作ができます。" },
   { title: "自分の記録を見る", body: "ヘッダーのアカウントアイコン→「プロフィール」から、全単語帳を合計した暗記度の状況や、直近のテスト実施記録を確認できます。" },
-  { title: "ランク制度について", body: "テスト(単語カードを除く)を5回行うと「Iron Ⅰ」からランクが始まります。Iron〜Veritasの8階級・各3段階(Veritasのみ段階なし)で、テストの成績や毎日のログインでポイントを獲得して昇格していきます。アカウントタブの「ランク」欄でバッジ・ポイント状況・過去の履歴を確認できます。ポイントが0を下回るとランクが1段階下がりますが、0ptになった直後の1回だけは踏みとどまれます。また、Diamond以上のランクは奇数月末(1・3・5・7・9・11月の末日23:59)にランクが2段階下がるので、継続してプレーしましょう。" }
+  // 仕様修正2026/09/13 No.1-12: 詳細は長く複雑なため、別ページ(rank-guide.html)に分離してリンクする
+  { title: "ランク制度について", body: 'テストの成績や毎日のログインでポイントを獲得し、Iron〜Veritasのランクを目指す機能です。詳しい仕組みは <a href="rank-guide.html" target="_blank" rel="noopener">こちらのページ</a> で解説しています。' }
 ];
 // ▲▲ ここまでユーザー編集エリア ▲▲
 
@@ -606,6 +607,7 @@ async function loadAccountBadge(user) {
   let text = "", number = "";
   let color = AVATAR_COLORS[hashString(user.uid) % AVATAR_COLORS.length];
 
+  let rank = null;
   try {
     const doc = await db.collection("users").doc(user.uid).get();
     if (doc.exists) {
@@ -614,6 +616,7 @@ async function loadAccountBadge(user) {
       if (data.avatarColor) color = data.avatarColor;
       if (data.avatarText) text = data.avatarText.toUpperCase();
       if (data.avatarNumber) number = data.avatarNumber;
+      rank = data.rank || null;
     }
   } catch (err) {
     console.error("[loadAccountBadge]", err);
@@ -621,6 +624,10 @@ async function loadAccountBadge(user) {
 
   renderAvatarContent(badge, { number, text, username });
   badge.style.background = color;
+
+  // 仕様追加2026/09/13 No.1-13: アカウントアイコンの左にランクバッジ(アイコンのみ)を表示
+  const rankBadgeImg = document.getElementById("header-rank-badge");
+  if (rankBadgeImg) rankBadgeImg.src = YNQ_RANK.rankBadgeImagePath(rank);
 }
 // アカウントタブでプロフィールを保存した直後、ヘッダーのアイコンにも即座に反映するための公開関数
 YNQ.refreshAccountBadge = () => YNQ.currentUser && loadAccountBadge(YNQ.currentUser);
@@ -649,10 +656,6 @@ async function renderTab(tabName) {
   const titleEl = document.getElementById("header-booktitle");
   titleEl.hidden = (tabName === "home");
   if (tabName === "home") YNQ.currentBook = null; // フォルダータブに戻ったら単語帳の選択状態を解除
-
-  // 仕様修正2026/09/12 #3: フォルダー一覧/単語帳一覧を見ている間はタブバー自体を非表示にし、
-  // 単語帳を開いている(フォルダー以外のタブにいる)時だけタブの項目を表示する
-  document.getElementById("tab-bar").hidden = (tabName === "home");
 
   try {
     const res = await fetch(`tabs/${tabName}.html`);
@@ -759,6 +762,19 @@ function setupHeaderInteractions() {
   document.getElementById("btn-volume").addEventListener("click", (e) => {
     e.stopPropagation();
     togglePopover("popover-volume");
+  });
+  // スマホ版ハンバーガーメニューからも音量調整を開けるようにする(仕様修正2026/09/13 No.1-13)
+  document.getElementById("mbtn-volume").addEventListener("click", (e) => {
+    e.stopPropagation();
+    closeMobileMenu();
+    togglePopover("popover-volume");
+  });
+
+  // 仕様追加2026/09/13 No.1-13: ヘッダーのランクバッジをクリックしたらアカウントタブ(ランク欄)へ
+  document.getElementById("btn-header-rank").addEventListener("click", () => {
+    closeAllPopovers();
+    closeMobileMenu();
+    loadTab("account");
   });
 
   // アカウントメニュー
@@ -984,7 +1000,7 @@ auth.onAuthStateChanged((user) => {
     loadAccountBadge(user);
     applyDailyLoginBonusIfNeeded(user); // 仕様D
     applySeasonalRankCheckIfNeeded(user); // 仕様Q
-    loadTab("home"); // タブバー自体の表示/非表示は renderTab 側で制御する
+    loadTab("home");
   } else {
     document.getElementById("app-shell").hidden = true;
     document.getElementById("tab-bar").hidden = true;
