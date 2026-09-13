@@ -15,14 +15,28 @@ window.ShareTab = (function () {
   function wordsCol(folderId, bookId) { return booksCol(folderId).doc(bookId).collection("words"); }
   function sharedCol() { return YNQ.db.collection("sharedWordbooks"); }
 
-  function init() {
+  async function init() {
     bindEvents();
-    loadOwnBooks();
+    await loadOwnBooks();
+
+    // 仕様追加2026/09/13 No.1-15: フォルダー一覧の単語帳カードから共有タブに飛んできた場合、
+    // その単語帳を共有フォームにあらかじめ選択しておく(js/folders.jsから設定される)
+    if (YNQ.shareTargetBook) {
+      const target = YNQ.shareTargetBook;
+      YNQ.shareTargetBook = null;
+      const select = document.getElementById("share-source-select");
+      select.value = `${target.folderId}::${target.bookId}`;
+    }
+
     loadSharedList();
   }
 
   function bindEvents() {
     document.getElementById("btn-share-publish").addEventListener("click", publishSelectedBook);
+
+    // 仕様追加2026/09/13 No.1-15: パスワード付き単語帳のインストール確認モーダル
+    document.getElementById("btn-close-share-password").addEventListener("click", () => YNQ.closeModal("modal-share-password"));
+    document.getElementById("btn-share-password-cancel").addEventListener("click", () => YNQ.closeModal("modal-share-password"));
   }
 
   /* ---------- 自分の単語帳を共有する ---------- */
@@ -57,6 +71,7 @@ window.ShareTab = (function () {
     const [folderId, bookId] = (select.value || "").split("::");
     if (!folderId || !bookId) { YNQ.showToast("共有する単語帳を選択してください"); return; }
     const description = document.getElementById("share-desc-input").value.trim();
+    const password = document.getElementById("share-password-input").value.trim(); // 仕様追加2026/09/13 No.1-15
 
     const btn = document.getElementById("btn-share-publish");
     btn.disabled = true;
@@ -77,6 +92,7 @@ window.ShareTab = (function () {
       const sharedRef = await sharedCol().add({
         name: bookData.name,
         description,
+        password: password || null, // 仕様追加2026/09/13 No.1-15: 未設定(null)ならパスワードなしでインストール可能
         wordCount: wordsSnap.size,
         authorUid: uid(),
         authorName,
@@ -93,6 +109,7 @@ window.ShareTab = (function () {
       await batch.commit();
 
       document.getElementById("share-desc-input").value = "";
+      document.getElementById("share-password-input").value = "";
       select.value = "";
       YNQ.showToast("単語帳を共有しました");
       loadSharedList();
@@ -137,6 +154,7 @@ window.ShareTab = (function () {
         <div class="shared-card-header">
           <span class="item-card-name">${YNQ.escapeHtml(s.name)}</span>
           ${s.official ? `<span class="badge-official"><i class="fa-solid fa-certificate"></i> 公式</span>` : ""}
+          ${s.password ? `<span class="badge-official" style="background:var(--color-bg-elevated);color:var(--color-text-muted);"><i class="fa-solid fa-lock"></i> パスワード制</span>` : ""}
         </div>
         <p class="item-card-desc">${desc}</p>
         <div class="shared-card-meta">
@@ -150,7 +168,37 @@ window.ShareTab = (function () {
       </div>`;
   }
 
+  // 仕様追加2026/09/13 No.1-15: パスワードが設定されている場合は先に照合する
   function installSharedBook(shared) {
+    if (shared.password) {
+      openSharePasswordModal(shared);
+    } else {
+      confirmAndInstall(shared);
+    }
+  }
+
+  function openSharePasswordModal(shared) {
+    const input = document.getElementById("share-password-confirm-input");
+    const errorEl = document.getElementById("share-password-error");
+    input.value = "";
+    errorEl.textContent = "";
+    YNQ.openModal("modal-share-password");
+    input.focus();
+
+    const okBtn = document.getElementById("btn-share-password-ok");
+    const newOkBtn = okBtn.cloneNode(true); // 直前のリスナー(別の単語帳向け)を消すため差し替える
+    okBtn.parentNode.replaceChild(newOkBtn, okBtn);
+    newOkBtn.addEventListener("click", () => {
+      if (input.value !== shared.password) {
+        errorEl.textContent = "パスワードが違います。";
+        return;
+      }
+      YNQ.closeModal("modal-share-password");
+      confirmAndInstall(shared);
+    });
+  }
+
+  function confirmAndInstall(shared) {
     YNQ.confirmDialog(`「${shared.name}」を自分の単語帳としてインストールしますか?\n「共有された単語帳」フォルダーに追加されます。`, async () => {
       try {
         const folderId = await ensureSharedFolder();

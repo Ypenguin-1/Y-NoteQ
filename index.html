@@ -163,8 +163,8 @@
         <i class="fa-solid fa-circle-half-stroke"></i>
       </button>
 
-      <!-- 音量調整(発音読み上げ / 効果音) -->
-      <div class="popover-wrap">
+      <!-- 音量調整(発音読み上げ / 効果音)。スマホ版ではハンバーガーメニューに集約する(仕様修正2026/09/13 No.1-13) -->
+      <div class="popover-wrap header-volume-wrap">
         <button type="button" class="btn-icon" id="btn-volume" title="音量調整">
           <i class="fa-solid fa-volume-high"></i>
         </button>
@@ -179,6 +179,11 @@
           </div>
         </div>
       </div>
+
+      <!-- 仕様追加2026/09/13 No.1-13: アカウントアイコンの左にランクバッジ(アイコンのみ)を表示 -->
+      <button type="button" class="btn-icon header-rank-badge-btn" id="btn-header-rank" title="ランク">
+        <img src="assets/ranks/Batch_Unranked.svg" alt="ランク" id="header-rank-badge">
+      </button>
 
       <!-- アカウントメニュー -->
       <div class="popover-wrap">
@@ -206,6 +211,7 @@
       <button type="button" class="header-nav-link" id="mbtn-howto"><i class="fa-solid fa-circle-question"></i> 使い方</button>
       <button type="button" class="header-nav-link" id="mbtn-patchnotes"><i class="fa-solid fa-clock-rotate-left"></i> パッチノート</button>
       <button type="button" class="header-nav-link" id="mbtn-theme"><i class="fa-solid fa-circle-half-stroke"></i> ライト/ダークモード切替</button>
+      <button type="button" class="header-nav-link" id="mbtn-volume"><i class="fa-solid fa-volume-high"></i> 音量調整</button>
       <button type="button" class="header-nav-link" id="mbtn-back"><i class="fa-solid fa-arrow-left"></i> 1つ前に戻る</button>
     </div>
   </div>

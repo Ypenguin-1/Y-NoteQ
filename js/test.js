@@ -67,6 +67,12 @@ window.TestTab = (function () {
     }
     return arr;
   }
+  // 仕様追加2026/09/13 No.1-4: 出題順序(ランダム/昇順/降順)に応じて並び替える
+  function orderPool(arr, order) {
+    if (order === "asc") return arr.sort((a, b) => a.no - b.no);
+    if (order === "desc") return arr.sort((a, b) => b.no - a.no);
+    return shuffle(arr);
+  }
   // "apple | orange" のような複数正答表記の先頭だけを表示用に取り出す
   function firstAlt(str) { return String(str || "").split("|")[0].trim(); }
   // 複数正答をすべて取り出す(入力記述の採点で使用)
@@ -116,6 +122,7 @@ window.TestTab = (function () {
     bindToggleGroup("test-set-direction", true);
     bindToggleGroup("test-set-scoring-timing", true);
     YNQ.bindLevelToggleGroup("test-set-levels", false, updateCandidatePool); // 仕様修正2026/09/12 #2: 各Level自身の色で表示
+    bindToggleGroup("test-set-order", true); // 仕様追加2026/09/13 No.1-4: 出題順序
     bindToggleGroup("test-set-format", true);
     bindToggleGroup("test-set-show-level", true);
     bindToggleGroup("test-set-level-scoring", true);
@@ -132,6 +139,7 @@ window.TestTab = (function () {
       count: Math.max(1, parseInt(document.getElementById("test-set-count").value, 10) || 1),
       direction: getToggleValue("test-set-direction"),
       scoringTiming: getToggleValue("test-set-scoring-timing"),
+      order: getToggleValue("test-set-order") || "random", // 仕様追加2026/09/13 No.1-4
       format: getToggleValue("test-set-format"),
       showLevel: getToggleValue("test-set-show-level") === "on",
       levelScoring: getToggleValue("test-set-level-scoring") === "on",
@@ -218,7 +226,7 @@ window.TestTab = (function () {
     updateCandidatePool();
     if (candidatePool.length === 0) { YNQ.showToast("対象となる単語がありません"); return; }
     settings = readSettings();
-    const pool = shuffle(candidatePool.slice());
+    const pool = orderPool(candidatePool.slice(), settings.order); // 仕様追加2026/09/13 No.1-4
     queue = pool.slice(0, Math.min(settings.count, pool.length));
     if (queue.length < settings.count) {
       YNQ.showToast(`対象が${queue.length}件のみのため、${queue.length}問で出題します`);
@@ -599,6 +607,15 @@ window.TestTab = (function () {
     accuracyBonus: "正答率ボーナス/ペナルティ(仕様N)",
     recentTouchBonus: "直近5日以内の復習ボーナス(仕様P)"
   };
+  // 内訳1項目の単価×件数を表示用テキストにする(仕様修正2026/09/13 No.1-3)。
+  // 例: 単価0.1ptが3件かかっていれば「0.1 × 3 pt」のように表記する。
+  function formatCategoryDetail(cat) {
+    if (!cat || !cat.items || cat.items.length === 0) return "";
+    return cat.items.map(it => {
+      const sign = it.unit >= 0 ? "+" : "";
+      return it.count > 1 ? `${sign}${it.unit.toFixed(1)} × ${it.count}pt` : `${sign}${it.unit.toFixed(1)}pt`;
+    }).join("、");
+  }
   function renderPointsBreakdown() {
     const btn = document.getElementById("btn-toggle-points-breakdown");
     const panel = document.getElementById("points-breakdown");
@@ -608,12 +625,17 @@ window.TestTab = (function () {
       return;
     }
     btn.hidden = false;
-    panel.innerHTML = Object.keys(POINTS_BREAKDOWN_LABELS).map(key => `
+    panel.innerHTML = Object.keys(POINTS_BREAKDOWN_LABELS).map(key => {
+      const cat = lastTestPoints.breakdown[key];
+      const detail = formatCategoryDetail(cat);
+      const showDetail = detail && (cat.items.length > 1 || cat.items[0].count > 1);
+      return `
       <div class="patch-entry">
-        <span>${POINTS_BREAKDOWN_LABELS[key]}</span>
-        <strong>${formatPt(lastTestPoints.breakdown[key] || 0)}</strong>
+        <span>${POINTS_BREAKDOWN_LABELS[key]}${showDetail ? `<br><small style="color:var(--color-text-muted);">${detail}</small>` : ""}</span>
+        <strong>${formatPt((cat && cat.total) || 0)}</strong>
       </div>
-    `).join("");
+    `;
+    }).join("");
   }
 
   function renderResults() {

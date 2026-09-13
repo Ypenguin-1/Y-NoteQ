@@ -6,6 +6,11 @@
 <div id="folders-tab-root">
   <div class="section-toolbar">
     <div class="breadcrumb" id="folders-breadcrumb"><!-- js/folders.js が生成 --></div>
+    <!-- 仕様追加2026/09/13 No.1-5: 正方形カード表示/一覧表示の切り替え -->
+    <div class="view-toggle" id="folders-view-toggle">
+      <button type="button" class="btn-icon" data-view="grid" title="正方形表示"><i class="fa-solid fa-table-cells"></i></button>
+      <button type="button" class="btn-icon" data-view="list" title="一覧表示"><i class="fa-solid fa-list"></i></button>
+    </div>
     <button type="button" class="btn btn-primary" id="btn-add-new">
       <i class="fa-solid fa-plus"></i> <span id="btn-add-new-label">新規フォルダー</span>
     </button>

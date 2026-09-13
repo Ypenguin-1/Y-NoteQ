@@ -118,7 +118,7 @@ window.AccountTab = (function () {
         return `
           <tr>
             <td>${YNQ.escapeHtml(period)}</td>
-            <td>${YNQ.escapeHtml(YNQ_RANK.rankLabel(r.rank))}</td>
+            <td><img src="${YNQ_RANK.rankBadgeImagePath(r.rank)}" alt="" class="rank-history-badge">${YNQ.escapeHtml(YNQ_RANK.rankLabel(r.rank))}</td>
             <td>${YNQ.escapeHtml(achieved)}</td>
           </tr>`;
       }).join("");
