@@ -50,8 +50,14 @@ const HOWTO_CONTENT = [
   { title: "テストで暗記度を上げる", body: "「テスト」タブで出題範囲・出題形式(単語カード/4択/入力記述)などを設定して小テストを開始できます。Level採点をONにすると正誤に応じて暗記度(Level)が自動で変動します。" },
   { title: "単語を編集する", body: "「編集」タブから単語の直接追加、CSV/Excelファイルからの一括インポート、単語ごとの修正・リセット・削除、範囲指定での一括操作ができます。" },
   { title: "自分の記録を見る", body: "ヘッダーのアカウントアイコン→「プロフィール」から、全単語帳を合計した暗記度の状況や、直近のテスト実施記録を確認できます。" },
-  // 仕様修正2026/09/13 No.1-12: 詳細は長く複雑なため、別ページ(rank-guide.html)に分離してリンクする
-  { title: "ランク制度について", body: 'テストの成績や毎日のログインでポイントを獲得し、Iron〜Veritasのランクを目指す機能です。詳しい仕組みは <a href="rank-guide.html" target="_blank" rel="noopener">こちらのページ</a> で解説しています。' }
+  // 仕様修正2026/09/13 No.1-12: 詳細は長く複雑なため、別ページ(rank-guide.html)に分離してリンクする。
+  // 仕様修正2026/09/13 No.2-4: 文中リンクだと(a{color:inherit}のため)目立たず気づかれなかったので、
+  // はっきり見えるボタン状のリンクとして別枠に表示する(link項目)
+  {
+    title: "ランク制度について",
+    body: "テストの成績や毎日のログインでポイントを獲得し、Iron〜Veritasのランクを目指す機能です。",
+    link: { href: "rank-guide.html", label: "ランク制度の詳しい説明を見る" }
+  }
 ];
 // ▲▲ ここまでユーザー編集エリア ▲▲
 
@@ -377,6 +383,7 @@ function renderHowto() {
     <div class="howto-item">
       <h3>・${item.title}</h3>
       <p>${item.body}</p>
+      ${item.link ? `<a class="howto-link" href="${item.link.href}" target="_blank" rel="noopener">${YNQ.escapeHtml(item.link.label)} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>` : ""}
     </div>
   `).join("");
 }
@@ -997,6 +1004,7 @@ auth.onAuthStateChanged((user) => {
     document.getElementById("screen-login").hidden = true;
     document.getElementById("screen-register").hidden = true;
     document.getElementById("app-shell").hidden = false;
+    document.getElementById("tab-bar").hidden = false; // 仕様修正2026/09/13 No.2-1: タブバーは常時表示
     loadAccountBadge(user);
     applyDailyLoginBonusIfNeeded(user); // 仕様D
     applySeasonalRankCheckIfNeeded(user); // 仕様Q

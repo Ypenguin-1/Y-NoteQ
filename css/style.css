@@ -456,8 +456,9 @@ body {
 .account-menu-divider { height: 1px; background: var(--color-border); margin: 6px 4px; }
 
 /* 仕様追加2026/09/13 No.1-13: ヘッダーのランクバッジ(アカウントアイコンの左) */
+/* 仕様修正2026/09/13 No.2-3: account-avatar(36px)と釣り合うようもう少し大きく表示する */
 .header-rank-badge-btn {
-  width: 32px; height: 32px; padding: 4px; border-radius: 50%;
+  width: 40px; height: 40px; padding: 2px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
 }
 #header-rank-badge { width: 100%; height: 100%; object-fit: contain; }
@@ -578,6 +579,20 @@ body {
 .howto-item { margin-bottom: 16px; }
 .howto-item h3 { font-size: 14px; margin: 0 0 4px; color: var(--color-primary-dark); }
 .howto-item p { font-size: 13px; margin: 0; color: var(--color-text-muted); line-height: 1.6; }
+/* 仕様修正2026/09/13 No.2-4: a{color:inherit}だと文中リンクが目立たないため、
+   はっきり分かるボタン状のリンクとして表示する */
+.howto-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary-dark);
+  text-decoration: underline;
+}
+.howto-link:hover { color: var(--color-primary); }
+.howto-link i { font-size: 11px; }
 
 .patch-entry { border-bottom: 1px solid var(--color-border); padding: 14px 0; }
 .patch-entry:first-child { padding-top: 0; }
@@ -1250,6 +1265,12 @@ table.word-table tbody tr:hover { background: var(--color-bg-elevated); }
 
   /* 仕様修正2026/09/13 No.1-2: スマホ版ではタブ名(アイコン下の文字)を少し小さくする */
   .tab-btn { font-size: 10px; }
+
+  /* 仕様修正2026/09/13 No.2-2: 一覧表示(list-view)はスマホ幅だと進捗グラフに幅を取られて
+     単語帳名が見えなくなってしまうため、グラフ(バー)自体を短くし、説明文は非表示にして名前を優先する */
+  .list-view .item-progress { flex: 0 0 76px; gap: 4px; }
+  .list-view .item-progress-bar { flex: 0 0 36px; }
+  .list-view .item-card-desc { display: none; }
 }
 
 /* 仕様修正2026/09/12 No.9: 「単語一覧」タブの表をスマホ縦画面で横スクロールなしに収める。
