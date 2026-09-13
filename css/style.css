@@ -614,6 +614,9 @@ body {
   color: var(--color-text-muted);
 }
 .points-breakdown-line strong { color: var(--color-text); font-weight: 700; white-space: nowrap; }
+/* 仕様修正2026/09/13 No.4-1: 「pt × N単語 = pt」の計算行は行全体を右寄せにする */
+.points-breakdown-calc-line { padding: 2px 0 2px 10px; font-size: 12px; color: var(--color-text-muted); text-align: right; }
+.points-breakdown-calc-line strong { color: var(--color-text); font-weight: 700; }
 .points-breakdown-total {
   display: flex;
   align-items: center;

@@ -16,11 +16,6 @@
 <style>
   /* このページ専用の簡易レイアウト(index.htmlのアプリ画面とは別に、単体で開ける説明ページ) */
   .rank-guide-wrap { max-width: 760px; margin: 0 auto; padding: 24px 20px 60px; }
-  .rank-guide-back {
-    display: inline-flex; align-items: center; gap: 6px;
-    color: var(--color-text-muted); text-decoration: none; font-size: 14px; margin-bottom: 16px;
-  }
-  .rank-guide-back:hover { color: var(--color-text); }
   .rank-guide-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
   .rank-guide-header img { width: 40px; height: 40px; }
   .rank-guide-header h1 { font-size: 22px; margin: 0; }
@@ -30,7 +25,10 @@
   .rank-guide-wrap ul { margin: 0; padding-left: 20px; }
   .rank-guide-wrap li { margin-bottom: 6px; }
   .rank-guide-note { color: var(--color-text-muted); font-size: 13px; }
-  .rank-tier-badges { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+  /* 仕様修正2026/09/13 No.4-4: 各階級ごとにI/II/IIIの3バッジすべてを表示する */
+  .rank-tier-groups { display: flex; flex-direction: column; gap: 14px; margin: 10px 0; }
+  .rank-tier-group-name { font-size: 13px; font-weight: 700; margin-bottom: 6px; }
+  .rank-tier-badges { display: flex; flex-wrap: wrap; gap: 10px; }
   .rank-tier-badges .tier { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 64px; }
   .rank-tier-badges img { width: 40px; height: 40px; object-fit: contain; }
   .rank-tier-badges span { font-size: 11px; color: var(--color-text-muted); text-align: center; }
@@ -39,8 +37,6 @@
 <body>
 
 <div class="rank-guide-wrap">
-  <a href="index.html" class="rank-guide-back"><i class="fa-solid fa-arrow-left"></i> Y-NoteQ に戻る</a>
-
   <div class="rank-guide-header">
     <img src="assets/ranks/Batch_Diamond_1.svg" alt="">
     <h1>ランク制度について</h1>
@@ -53,15 +49,69 @@
       ランクは Iron → Bronze → Silver → Gold → Platinum → Diamond → Master → Veritas の8階級で、
       Veritasを除く各階級は Ⅰ・Ⅱ・Ⅲ の3段階に分かれています(Veritasのみ段階なしの最高ランク)。
     </p>
-    <div class="rank-tier-badges">
-      <div class="tier"><img src="assets/ranks/Batch_Iron_1.svg" alt=""><span>Iron</span></div>
-      <div class="tier"><img src="assets/ranks/Batch_Bronze_1.svg" alt=""><span>Bronze</span></div>
-      <div class="tier"><img src="assets/ranks/Batch_Silver_1.svg" alt=""><span>Silver</span></div>
-      <div class="tier"><img src="assets/ranks/Batch_Gold_1.svg" alt=""><span>Gold</span></div>
-      <div class="tier"><img src="assets/ranks/Batch_Platinum_1.svg" alt=""><span>Platinum</span></div>
-      <div class="tier"><img src="assets/ranks/Batch_Diamond_1.svg" alt=""><span>Diamond</span></div>
-      <div class="tier"><img src="assets/ranks/Batch_Master_1.svg" alt=""><span>Master</span></div>
-      <div class="tier"><img src="assets/ranks/Batch_Veritas.svg" alt=""><span>Veritas</span></div>
+    <div class="rank-tier-groups">
+      <div>
+        <div class="rank-tier-group-name">Iron</div>
+        <div class="rank-tier-badges">
+          <div class="tier"><img src="assets/ranks/Batch_Iron_1.svg" alt=""><span>Iron Ⅰ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Iron_2.svg" alt=""><span>Iron Ⅱ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Iron_3.svg" alt=""><span>Iron Ⅲ</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="rank-tier-group-name">Bronze</div>
+        <div class="rank-tier-badges">
+          <div class="tier"><img src="assets/ranks/Batch_Bronze_1.svg" alt=""><span>Bronze Ⅰ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Bronze_2.svg" alt=""><span>Bronze Ⅱ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Bronze_3.svg" alt=""><span>Bronze Ⅲ</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="rank-tier-group-name">Silver</div>
+        <div class="rank-tier-badges">
+          <div class="tier"><img src="assets/ranks/Batch_Silver_1.svg" alt=""><span>Silver Ⅰ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Silver_2.svg" alt=""><span>Silver Ⅱ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Silver_3.svg" alt=""><span>Silver Ⅲ</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="rank-tier-group-name">Gold</div>
+        <div class="rank-tier-badges">
+          <div class="tier"><img src="assets/ranks/Batch_Gold_1.svg" alt=""><span>Gold Ⅰ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Gold_2.svg" alt=""><span>Gold Ⅱ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Gold_3.svg" alt=""><span>Gold Ⅲ</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="rank-tier-group-name">Platinum</div>
+        <div class="rank-tier-badges">
+          <div class="tier"><img src="assets/ranks/Batch_Platinum_1.svg" alt=""><span>Platinum Ⅰ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Platinum_2.svg" alt=""><span>Platinum Ⅱ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Platinum_3.svg" alt=""><span>Platinum Ⅲ</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="rank-tier-group-name">Diamond</div>
+        <div class="rank-tier-badges">
+          <div class="tier"><img src="assets/ranks/Batch_Diamond_1.svg" alt=""><span>Diamond Ⅰ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Diamond_2.svg" alt=""><span>Diamond Ⅱ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Diamond_3.svg" alt=""><span>Diamond Ⅲ</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="rank-tier-group-name">Master</div>
+        <div class="rank-tier-badges">
+          <div class="tier"><img src="assets/ranks/Batch_Master_1.svg" alt=""><span>Master Ⅰ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Master_2.svg" alt=""><span>Master Ⅱ</span></div>
+          <div class="tier"><img src="assets/ranks/Batch_Master_3.svg" alt=""><span>Master Ⅲ</span></div>
+        </div>
+      </div>
+      <div>
+        <div class="rank-tier-group-name">Veritas <span style="font-weight:400;color:var(--color-text-muted);">(段階なし)</span></div>
+        <div class="rank-tier-badges">
+          <div class="tier"><img src="assets/ranks/Batch_Veritas.svg" alt=""><span>Veritas</span></div>
+        </div>
+      </div>
     </div>
     <p class="rank-guide-note">
       Iron〜Goldは1段階あたり100ptが上限、Platinum以上は1段階あたり200ptが上限です(Veritasのみ上限なし)。

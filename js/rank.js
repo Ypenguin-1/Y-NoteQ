@@ -156,6 +156,7 @@ window.YNQ_RANK = (function () {
   const POINTS_PER_10_QUESTIONS = 2.0;       // 仕様M: 10問ごとのボーナス(正答率無関係)
   const POINTS_RECENT_TOUCH_BONUS = 0.2;     // 仕様P: 直近5日以内に触れていた単語(正誤問わず)
   const RECENT_TOUCH_DAYS = 5;               // 仕様P
+  const ACCURACY_BONUS_MIN_QUESTIONS = 5;    // 仕様修正2026/09/13 No.4-2: 正答率ボーナス(仕様N)は出題数5問以上でのみ適用
   const TYPED_FORMAT_MULTIPLIER = 1.2;       // 仕様修正2026/09/13 No.1-9: 入力記述形式は合計ptを×1.2する
 
   // 仕様N: 正答率に応じたボーナス/ペナルティ(境界値は「以上未満」で判定)
@@ -255,10 +256,12 @@ window.YNQ_RANK = (function () {
       const tenQuestionCount = Math.floor(totalQ / 10);
       addToCategory(breakdown.tenQuestionBonus, POINTS_PER_10_QUESTIONS, tenQuestionCount);
 
-      // 仕様N: 正答率に応じたボーナス/ペナルティ
-      const correct = (answers || []).filter(a => a.isCorrect).length;
-      const accPct = totalQ > 0 ? (correct / totalQ) * 100 : 0;
-      addToCategory(breakdown.accuracyBonus, accuracyBonusPoints(accPct));
+      // 仕様N: 正答率に応じたボーナス/ペナルティ(仕様修正2026/09/13 No.4-2: 出題数5問以上の時だけ適用)
+      if (totalQ >= ACCURACY_BONUS_MIN_QUESTIONS) {
+        const correct = (answers || []).filter(a => a.isCorrect).length;
+        const accPct = (correct / totalQ) * 100;
+        addToCategory(breakdown.accuracyBonus, accuracyBonusPoints(accPct));
+      }
 
       // 仕様P: 直近5日以内に触れていた単語は1語につき+0.2pt(正誤問わず)
       (answers || []).forEach(a => {
