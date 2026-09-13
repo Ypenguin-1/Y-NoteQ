@@ -411,8 +411,8 @@ window.TestTab = (function () {
     }
   }
 
-  // Level採点(仕様修正2026/09/12 #1):
-  // ・不正解は即座にLevelを+1(5が上限)。
+  // Level採点(仕様修正2026/09/12 #1、仕様修正2026/09/13 No.4-3):
+  // ・不正解は即座にLevelを+1(5が上限)。ただし初見(Level0)を間違えた場合は特別にLevel2にする。
   // ・正解は2回連続して初めてLevelを-1(1が下限)。1回だけの正解では変動せず、
   //   「あと1回正解でLevel down」という連続正解カウントだけを進める。
   // ・Level1はこれ以上下げる必要がないため、連続カウント不要でそのまま1を維持する(仕様#1)。
@@ -420,7 +420,11 @@ window.TestTab = (function () {
   function computeLevelUpdate(current, streak, isCorrect) {
     const cur = current || 0;
     if (!isCorrect) {
-      return { level: cur === 0 ? 1 : Math.min(5, cur + 1), streak: 0 };
+      // 仕様修正2026/09/13 No.4-3: 初見(Level0)の単語を間違えた場合はLevel2にする
+      // (ランクpt計算側では初見の単語はもともと仕様Eのみが対象でLevel変動のペナルティ(仕様J)は
+      //  かからないため、ここで即Level2にしても間違いへのペナルティが余計にかかることはない)
+      if (cur === 0) return { level: 2, streak: 0 };
+      return { level: Math.min(5, cur + 1), streak: 0 };
     }
     if (cur <= 1) {
       return { level: 1, streak: 0 };
@@ -610,13 +614,15 @@ window.TestTab = (function () {
     levelChange: "Levelの推移"
   };
   // 「〇pt × ▢単語 = △pt」形式の行を作る(単価が複数種類あれば複数行になる)
+  // 仕様修正2026/09/13 No.4-1: 「pt × N単語 = pt」の計算行はカテゴリタイトル(左寄せ)とは別に
+  // 行全体を右寄せで表記する
   function formatCategoryLines(cat) {
     if (!cat || !cat.items || cat.items.length === 0) {
-      return `<div class="points-breakdown-line"><span>該当なし</span><strong>${formatPt(0)}</strong></div>`;
+      return `<div class="points-breakdown-calc-line">${formatPt(0)}</div>`;
     }
     return cat.items.map(it => {
       const lineTotal = YNQ_RANK.roundPt(it.unit * it.count);
-      return `<div class="points-breakdown-line"><span>${formatPt(it.unit)} × ${it.count}単語</span><strong>= ${formatPt(lineTotal)}</strong></div>`;
+      return `<div class="points-breakdown-calc-line">${formatPt(it.unit)} × ${it.count}単語 = <strong>${formatPt(lineTotal)}</strong></div>`;
     }).join("");
   }
   function renderPointsBreakdown() {
