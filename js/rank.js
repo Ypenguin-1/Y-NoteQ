@@ -201,7 +201,10 @@ window.YNQ_RANK = (function () {
   // (仕様修正2026/09/13 No.1-3)。
   function mkCategory() { return { total: 0, items: [] }; }
   function addToCategory(cat, unit, times) {
-    times = times || 1;
+    // 仕様修正2026/09/13 No.3-1: `times || 1` だと明示的に times=0 を渡した場合(例: 出題数が
+    // 10問未満でtenQuestionCount=0)でも「未指定」とみなされ1回分が付与されてしまうバグがあった。
+    // 0回は正しく0回として扱う。
+    if (times === undefined) times = 1;
     if (!unit || !times) return;
     unit = roundPt(unit);
     let entry = cat.items.find(it => it.unit === unit);
@@ -218,14 +221,19 @@ window.YNQ_RANK = (function () {
   // levelScoring: 設定画面の「Level・ランク採点」がONかどうか。OFFの間はランクpt自体を
   //   一切与えない(仕様修正2026/09/13 No.1-10)。
   // today: "YYYY/MM/DD" 形式の今日の日付
+  //
+  // 内訳(breakdown)は仕様修正2026/09/13 No.3-4で4項目に再構成:
+  //   level0Touch(初見の単語に触れた=仕様E)/ levelMaintain(Levelの維持=仕様H,I)/
+  //   levelChange(Levelの推移=仕様J,K,L)/ tenQuestionBonus・accuracyBonus・recentTouchBonus
+  //   (この3つと形式ボーナスをまとめて画面側で「ボーナス」として表示する)
   function computeTestPoints({ answers, format, levelScoring, today }) {
     const breakdown = {
-      level0Touch: mkCategory(), levelTransition: mkCategory(),
+      level0Touch: mkCategory(), levelMaintain: mkCategory(), levelChange: mkCategory(),
       tenQuestionBonus: mkCategory(), accuracyBonus: mkCategory(), recentTouchBonus: mkCategory()
     };
 
     // 仕様修正2026/09/13 No.1-10: Level・ランク採点がOFFの間はランクptを一切与えない
-    if (!levelScoring) return { total: 0, breakdown };
+    if (!levelScoring) return { total: 0, subtotal: 0, formatMultiplierApplied: false, breakdown };
 
     // 仕様E: Level0の単語に触れた場合は、テスト方式・正誤を問わず常に加算
     (answers || []).forEach(a => {
@@ -234,9 +242,12 @@ window.YNQ_RANK = (function () {
 
     // 仕様G: ここから先は「単語カード」形式では加算しない
     if (format !== "flashcard") {
-      // 仕様H〜L: Levelの維持/変動に応じて加算
+      // 仕様H〜L: Levelの維持(H,I)/推移(J,K,L)を分けて加算(仕様修正2026/09/13 No.3-4)
       (answers || []).forEach(a => {
-        addToCategory(breakdown.levelTransition, pointsForLevelTransition(a.levelBefore, a.levelAfter));
+        if ((a.levelBefore || 0) === 0) return; // 仕様Eのみ対象、ここでは対象外
+        const pts = pointsForLevelTransition(a.levelBefore, a.levelAfter);
+        const cat = a.levelAfter === a.levelBefore ? breakdown.levelMaintain : breakdown.levelChange;
+        addToCategory(cat, pts);
       });
 
       // 仕様M: 出題数10問ごとに+2pt(正答率は無関係)
@@ -257,14 +268,14 @@ window.YNQ_RANK = (function () {
       });
     }
 
-    let rawTotal = breakdown.level0Touch.total + breakdown.levelTransition.total + breakdown.tenQuestionBonus.total
-      + breakdown.accuracyBonus.total + breakdown.recentTouchBonus.total;
+    const subtotal = roundPt(breakdown.level0Touch.total + breakdown.levelMaintain.total + breakdown.levelChange.total
+      + breakdown.tenQuestionBonus.total + breakdown.accuracyBonus.total + breakdown.recentTouchBonus.total);
 
     // 仕様修正2026/09/13 No.1-9: テスト形式が「入力記述」の場合は合計ptを×1.2する
-    if (format === "typed") rawTotal *= TYPED_FORMAT_MULTIPLIER;
+    const formatMultiplierApplied = format === "typed";
+    const total = roundPt(formatMultiplierApplied ? subtotal * TYPED_FORMAT_MULTIPLIER : subtotal);
 
-    const total = Math.round(rawTotal * 10) / 10; // 小数第1位までに丸める
-    return { total, breakdown };
+    return { total, subtotal, formatMultiplierApplied, breakdown };
   }
 
   /* ----------------------------------------------------------

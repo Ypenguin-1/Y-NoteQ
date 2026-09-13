@@ -185,6 +185,17 @@
     <section class="panel test-result-summary">
       <h2 class="panel-title"><i class="fa-solid fa-trophy"></i> 結果</h2>
       <div class="test-result-score" id="test-result-score"></div>
+      <!-- 仕様追加2026/09/13 No.3-3: ランク・ポイント推移(ランクなしの間は非表示) -->
+      <div class="test-result-rank" id="test-result-rank" hidden>
+        <div class="test-result-rank-badge-wrap">
+          <img src="assets/ranks/Batch_Unranked.svg" alt="" id="test-result-rank-badge" class="test-result-rank-badge">
+        </div>
+        <div class="test-result-rank-info">
+          <div class="test-result-rank-name" id="test-result-rank-name"></div>
+          <div class="rank-progress-bar"><div class="rank-progress-fill" id="test-result-rank-fill" style="width:0%;"></div></div>
+          <div class="test-result-rank-points" id="test-result-rank-points"></div>
+        </div>
+      </div>
       <!-- 仕様追加2026/09/12 No.5-4: 獲得ポイントの内訳(ランクなしの間は非表示) -->
       <button type="button" class="patch-history-toggle" id="btn-toggle-points-breakdown" hidden>
         ポイントの内訳を見る <i class="fa-solid fa-chevron-down"></i>

@@ -587,7 +587,9 @@ window.TestTab = (function () {
       YNQ.maybeUpdatePeakRank(updateData, data.peakRank, newRankState); // 仕様R: 履歴表示用
       await userRef.set(updateData, { merge: true });
       await YNQ.logRankPromotionIfNeeded(userRef, rank, newRankState); // 仕様R: 昇格を履歴に記録
-      return pointsResult;
+      // 仕様追加2026/09/13 No.3-3: 結果画面でランク/ポイント推移をアニメーション表示するため、
+      // テスト前後のランク状態も一緒に返す
+      return { ...pointsResult, rankBefore: rank, rankAfter: newRankState };
     } catch (err) {
       console.error("[test:applyRankProgressForTest]", err);
       return null; // ランク更新に失敗してもテスト結果自体の表示は継続する
@@ -599,22 +601,23 @@ window.TestTab = (function () {
     return `${n >= 0 ? "+" : ""}${n.toFixed(1)}pt`;
   }
 
-  // 仕様追加2026/09/12 No.5-4: 獲得ポイントの内訳を開閉できる詳細表示として出す
-  const POINTS_BREAKDOWN_LABELS = {
-    level0Touch: "Level0の単語に触れた(仕様E)",
-    levelTransition: "Levelの維持・変動(仕様H〜L)",
-    tenQuestionBonus: "出題数ボーナス(10問ごと・仕様M)",
-    accuracyBonus: "正答率ボーナス/ペナルティ(仕様N)",
-    recentTouchBonus: "直近5日以内の復習ボーナス(仕様P)"
+  // 仕様修正2026/09/13 No.3-4: 獲得ポイントの内訳を「初見の単語に触れた」「Levelの維持」
+  // 「Levelの推移」「ボーナス」の4項目に再構成し、一番下に合計行(ひっ算のように)を表示する。
+  // 項目(ラベル)は左寄せ、計算(pt)は右寄せ。
+  const POINTS_WORD_CATEGORY_LABELS = {
+    level0Touch: "初見の単語に触れた",
+    levelMaintain: "Levelの維持",
+    levelChange: "Levelの推移"
   };
-  // 内訳1項目の単価×件数を表示用テキストにする(仕様修正2026/09/13 No.1-3)。
-  // 例: 単価0.1ptが3件かかっていれば「0.1 × 3 pt」のように表記する。
-  function formatCategoryDetail(cat) {
-    if (!cat || !cat.items || cat.items.length === 0) return "";
+  // 「〇pt × ▢単語 = △pt」形式の行を作る(単価が複数種類あれば複数行になる)
+  function formatCategoryLines(cat) {
+    if (!cat || !cat.items || cat.items.length === 0) {
+      return `<div class="points-breakdown-line"><span>該当なし</span><strong>${formatPt(0)}</strong></div>`;
+    }
     return cat.items.map(it => {
-      const sign = it.unit >= 0 ? "+" : "";
-      return it.count > 1 ? `${sign}${it.unit.toFixed(1)} × ${it.count}pt` : `${sign}${it.unit.toFixed(1)}pt`;
-    }).join("、");
+      const lineTotal = YNQ_RANK.roundPt(it.unit * it.count);
+      return `<div class="points-breakdown-line"><span>${formatPt(it.unit)} × ${it.count}単語</span><strong>= ${formatPt(lineTotal)}</strong></div>`;
+    }).join("");
   }
   function renderPointsBreakdown() {
     const btn = document.getElementById("btn-toggle-points-breakdown");
@@ -625,17 +628,114 @@ window.TestTab = (function () {
       return;
     }
     btn.hidden = false;
-    panel.innerHTML = Object.keys(POINTS_BREAKDOWN_LABELS).map(key => {
-      const cat = lastTestPoints.breakdown[key];
-      const detail = formatCategoryDetail(cat);
-      const showDetail = detail && (cat.items.length > 1 || cat.items[0].count > 1);
-      return `
-      <div class="patch-entry">
-        <span>${POINTS_BREAKDOWN_LABELS[key]}${showDetail ? `<br><small style="color:var(--color-text-muted);">${detail}</small>` : ""}</span>
-        <strong>${formatPt((cat && cat.total) || 0)}</strong>
+
+    const b = lastTestPoints.breakdown;
+    const wordCatsHtml = Object.keys(POINTS_WORD_CATEGORY_LABELS).map(key => `
+      <div class="points-breakdown-cat">
+        <div class="points-breakdown-cat-title">${POINTS_WORD_CATEGORY_LABELS[key]}</div>
+        ${formatCategoryLines(b[key])}
+      </div>
+    `).join("");
+
+    const bonusRows = [
+      { label: "出題数ボーナス", value: formatPt(b.tenQuestionBonus.total) },
+      { label: "正答率ボーナス/ペナルティ", value: formatPt(b.accuracyBonus.total) },
+      { label: "復習ボーナス", value: formatPt(b.recentTouchBonus.total) }
+    ];
+    if (lastTestPoints.formatMultiplierApplied) {
+      bonusRows.push({
+        label: "形式ボーナス",
+        value: `${formatPt(lastTestPoints.subtotal)} × 1.2 = ${formatPt(lastTestPoints.total)}`
+      });
+    }
+    const bonusHtml = `
+      <div class="points-breakdown-cat">
+        <div class="points-breakdown-cat-title">ボーナス</div>
+        ${bonusRows.map(r => `<div class="points-breakdown-line"><span>${r.label}</span><strong>${r.value}</strong></div>`).join("")}
       </div>
     `;
-    }).join("");
+
+    panel.innerHTML = `
+      ${wordCatsHtml}
+      ${bonusHtml}
+      <div class="points-breakdown-total"><span>合計</span><strong>${formatPt(lastTestPoints.total)}</strong></div>
+    `;
+  }
+
+  // 仕様追加2026/09/13 No.3-3: 結果画面にランク/ポイント推移をアニメーション付きで表示する
+  function animateNumber(el, from, to, duration, formatFn) {
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min(1, (now - start) / duration);
+      el.textContent = formatFn(from + (to - from) * t);
+      if (t < 1) requestAnimationFrame(step);
+    }
+    requestAnimationFrame(step);
+  }
+  function renderRankProgress() {
+    const wrap = document.getElementById("test-result-rank");
+    if (!lastTestPoints || !lastTestPoints.rankAfter) { wrap.hidden = true; return; }
+    wrap.hidden = false;
+
+    const badgeImg = document.getElementById("test-result-rank-badge");
+    const nameEl = document.getElementById("test-result-rank-name");
+    const fillEl = document.getElementById("test-result-rank-fill");
+    const ptsEl = document.getElementById("test-result-rank-points");
+
+    const before = lastTestPoints.rankBefore;
+    const after = lastTestPoints.rankAfter;
+    const beforeIdx = YNQ_RANK.findStepIndex(before.tier, before.division);
+    const afterIdx = YNQ_RANK.findStepIndex(after.tier, after.division);
+    const promoted = afterIdx > beforeIdx;
+    const demoted = afterIdx < beforeIdx;
+
+    function pctFor(pts, max) { return max === null ? 100 : Math.max(0, Math.min(100, (pts / max) * 100)); }
+    function ptsLabel(rank) {
+      const max = YNQ_RANK.tierMaxPoints(rank.tier);
+      return max === null ? `${rank.points.toFixed(1)}pt(上限なし)` : `${rank.points.toFixed(1)} / ${max}pt`;
+    }
+
+    // 初期表示(テスト前の状態)
+    badgeImg.src = YNQ_RANK.rankBadgeImagePath(before);
+    badgeImg.classList.remove("test-result-rank-badge-pop");
+    nameEl.textContent = YNQ_RANK.rankLabel(before);
+    ptsEl.textContent = ptsLabel(before);
+    fillEl.style.transition = "none";
+    fillEl.style.width = `${pctFor(before.points, YNQ_RANK.tierMaxPoints(before.tier))}%`;
+    void fillEl.offsetWidth; // 強制リフロー(このあとのtransitionを効かせるため)
+
+    if (!promoted && !demoted) {
+      // 段階が変わらない場合: そのままバー・ポイントをアニメーションさせる
+      fillEl.style.transition = "width .6s ease";
+      requestAnimationFrame(() => {
+        fillEl.style.width = `${pctFor(after.points, YNQ_RANK.tierMaxPoints(after.tier))}%`;
+      });
+      animateNumber(ptsEl, before.points, after.points, 600, (v) => {
+        const max = YNQ_RANK.tierMaxPoints(after.tier);
+        return max === null ? `${v.toFixed(1)}pt(上限なし)` : `${v.toFixed(1)} / ${max}pt`;
+      });
+    } else {
+      // 段階が変わる場合: 今の段階を満タン(0%)まで満たしてから、バッジを差し替えて
+      // 新しい段階を0%(満タン)から実際のptまで満たす2段階アニメーションにする
+      fillEl.style.transition = "width .5s ease";
+      requestAnimationFrame(() => { fillEl.style.width = promoted ? "100%" : "0%"; });
+
+      setTimeout(() => {
+        badgeImg.src = YNQ_RANK.rankBadgeImagePath(after);
+        badgeImg.classList.add("test-result-rank-badge-pop");
+        nameEl.innerHTML = `${YNQ.escapeHtml(YNQ_RANK.rankLabel(after))}` +
+          `<span class="test-result-rank-change${demoted ? " is-demoted" : ""}">${promoted ? "昇格!" : "降格"}</span>`;
+
+        fillEl.style.transition = "none";
+        fillEl.style.width = promoted ? "0%" : "100%";
+        void fillEl.offsetWidth;
+        fillEl.style.transition = "width .5s ease";
+        requestAnimationFrame(() => {
+          fillEl.style.width = `${pctFor(after.points, YNQ_RANK.tierMaxPoints(after.tier))}%`;
+        });
+      }, 550);
+      animateNumber(ptsEl, before.points, after.points, 1100, (v) => `${v.toFixed(1)}pt`);
+    }
   }
 
   function renderResults() {
@@ -645,6 +745,7 @@ window.TestTab = (function () {
     // 仕様追加2026/09/12 No.4-G: 獲得ポイントを表示(ランクなしの間は表示しない)
     const pointsHtml = lastTestPoints ? `<small>獲得ポイント: ${formatPt(lastTestPoints.total)}</small>` : "";
     document.getElementById("test-result-score").innerHTML = `${pct}%<small>${correctCount} / ${total} 問正解</small>${pointsHtml}`;
+    renderRankProgress(); // 仕様追加2026/09/13 No.3-3
     renderPointsBreakdown(); // 仕様追加2026/09/12 No.5-4
 
     const tbody = document.getElementById("test-result-body");
