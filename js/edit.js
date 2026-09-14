@@ -122,19 +122,23 @@ window.EditTab = (function () {
     const meaning = meaningInput.value.trim();
     if (!word || !meaning) { YNQ.showToast("単語と意味の両方を入力してください"); return; }
     const level = getToggleValue("add-word-level") || 0;
+    const no = nextNo();
 
     const btn = document.getElementById("btn-add-word");
     btn.disabled = true;
     try {
-      await wordsRef().add({
-        no: nextNo(), word, meaning, level,
+      const ref = await wordsRef().add({
+        no, word, meaning, level,
         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
       });
+      // 仕様修正2026/09/14: Firestoreの読み取り量削減のため、全件を再取得せずローカルに反映する
+      allWords.push({ id: ref.id, no, word, meaning, level, correctStreak: 0 });
+      renderWordTable();
+      YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords);
       wordInput.value = ""; meaningInput.value = "";
       YNQ.setLevelToggleValue("add-word-level", 0);
       YNQ.showToast("単語を追加しました");
-      await loadWords();
     } catch (err) {
       console.error("[edit:addWord]", err);
       YNQ.showToast("追加に失敗しました");
@@ -215,17 +219,22 @@ window.EditTab = (function () {
 
       YNQ.confirmDialog(`${parsed.length}件のデータを読み込みました。単語帳にインポートしますか?`, async () => {
         try {
+          const newWords = [];
           await commitInChunks(parsed, (batch, p) => {
             const ref = wordsRef().doc();
+            newWords.push({ id: ref.id, no: p.no, word: p.word, meaning: p.meaning, level: p.level, correctStreak: 0 });
             batch.set(ref, {
               no: p.no, word: p.word, meaning: p.meaning, level: p.level,
               createdAt: firebase.firestore.FieldValue.serverTimestamp(),
               updatedAt: firebase.firestore.FieldValue.serverTimestamp()
             });
           });
+          // 仕様修正2026/09/14: Firestoreの読み取り量削減のため、全件を再取得せずローカルに反映する
+          allWords = allWords.concat(newWords);
           if (isCsv) await renameCurrentBookFromFileName(file.name); // 仕様修正2026/09/12 No.5-3
+          renderWordTable();
+          YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords);
           YNQ.showToast(`${parsed.length}件をインポートしました`);
-          await loadWords();
         } catch (err) {
           console.error("[edit:handleImportFile:commit]", err);
           YNQ.showToast("インポートに失敗しました");
@@ -275,8 +284,16 @@ window.EditTab = (function () {
           if (level === 0) data.lastTestDate = firebase.firestore.FieldValue.delete();
           batch.update(wordsRef().doc(w.id), data);
         });
+        // 仕様修正2026/09/14: Firestoreの読み取り量削減のため、全件を再取得せずローカルに反映する
+        const targetIds = new Set(targets.map(w => w.id));
+        allWords.forEach(w => {
+          if (!targetIds.has(w.id)) return;
+          w.level = level; w.correctStreak = 0;
+          if (level === 0) w.lastTestDate = null;
+        });
+        renderWordTable();
+        YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords);
         YNQ.showToast("一括変更しました");
-        await loadWords();
       } catch (err) {
         console.error("[edit:bulkApplyLevel]", err);
         YNQ.showToast("一括変更に失敗しました");
@@ -290,8 +307,12 @@ window.EditTab = (function () {
     YNQ.confirmDialog(`${targets.length}件の単語を削除しますか?\nこの操作は元に戻せません。`, async () => {
       try {
         await commitInChunks(targets, (batch, w) => batch.delete(wordsRef().doc(w.id)));
+        // 仕様修正2026/09/14: Firestoreの読み取り量削減のため、全件を再取得せずローカルに反映する
+        const targetIds = new Set(targets.map(w => w.id));
+        allWords = allWords.filter(w => !targetIds.has(w.id));
+        renderWordTable();
+        YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords);
         YNQ.showToast("一括削除しました");
-        await loadWords();
       } catch (err) {
         console.error("[edit:bulkDelete]", err);
         YNQ.showToast("一括削除に失敗しました");
@@ -331,9 +352,17 @@ window.EditTab = (function () {
       const data = { no, word, meaning, level, correctStreak: 0, updatedAt: firebase.firestore.FieldValue.serverTimestamp() };
       if (level === 0) data.lastTestDate = firebase.firestore.FieldValue.delete();
       await wordsRef().doc(editingWordId).update(data);
+      // 仕様修正2026/09/14: Firestoreの読み取り量削減のため、全件を再取得せずローカルに反映する
+      const w = allWords.find(x => x.id === editingWordId);
+      if (w) {
+        w.no = no; w.word = word; w.meaning = meaning; w.level = level; w.correctStreak = 0;
+        if (level === 0) w.lastTestDate = null;
+      }
+      allWords.sort((a, b) => (a.no || 0) - (b.no || 0)); // 単語No.が変わった場合も表の並び順を保つ
       YNQ.closeModal("modal-word-edit");
+      renderWordTable();
+      YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords);
       YNQ.showToast("修正しました");
-      await loadWords();
     } catch (err) {
       console.error("[edit:saveWordEdit]", err);
       errorEl.textContent = "保存に失敗しました。時間をおいて再度お試しください。";
@@ -353,8 +382,11 @@ window.EditTab = (function () {
           lastTestDate: firebase.firestore.FieldValue.delete(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        // 仕様修正2026/09/14: Firestoreの読み取り量削減のため、全件を再取得せずローカルに反映する
+        w.level = 0; w.correctStreak = 0; w.lastTestDate = null;
+        renderWordTable();
+        YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords);
         YNQ.showToast("未実施に戻しました");
-        await loadWords();
       } catch (err) {
         console.error("[edit:resetWord]", err);
         YNQ.showToast("リセットに失敗しました");
@@ -368,8 +400,11 @@ window.EditTab = (function () {
     YNQ.confirmDialog(`単語「${w.word}」を削除しますか?\nこの操作は元に戻せません。`, async () => {
       try {
         await wordsRef().doc(wordId).delete();
+        // 仕様修正2026/09/14: Firestoreの読み取り量削減のため、全件を再取得せずローカルに反映する
+        allWords = allWords.filter(x => x.id !== wordId);
+        renderWordTable();
+        YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords);
         YNQ.showToast("削除しました");
-        await loadWords();
       } catch (err) {
         console.error("[edit:deleteWord]", err);
         YNQ.showToast("削除に失敗しました");

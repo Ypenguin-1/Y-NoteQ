@@ -527,6 +527,7 @@ window.TestTab = (function () {
             if ((a.levelBefore || 0) === 0 && !w.firstSeenDate) w.firstSeenDate = today;
           }
         });
+        YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords); // 仕様修正2026/09/14
       }
 
       // 仕様追加2026/09/12 No.4: ランクポイントの計算・付与(単語カードでは仕様Eのみ、それ以外は仕様H〜Pも対象)
@@ -799,6 +800,7 @@ window.TestTab = (function () {
             updatedAt: firebase.firestore.FieldValue.serverTimestamp()
           });
           if (w) { w.level = lv; w.correctStreak = 0; Object.assign(w, dateFields); }
+          YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords); // 仕様修正2026/09/14
           renderResults();
         } catch (err) {
           console.error("[test:openResultLevelPicker]", err);

@@ -259,6 +259,7 @@ window.WordlistTab = (function () {
       if (w) { w.level = level; w.correctStreak = 0; Object.assign(w, dateFields); }
       renderAnalytics();
       applyFilters();
+      YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords); // 仕様修正2026/09/14
     } catch (err) {
       console.error("[wordlist:setWordLevel]", err);
       YNQ.showToast("更新に失敗しました");
@@ -278,6 +279,7 @@ window.WordlistTab = (function () {
         if (w) { w.level = 0; w.correctStreak = 0; w.lastTestDate = null; }
         renderAnalytics();
         applyFilters();
+        YNQ.updateBookStats(YNQ.currentFolder.id, YNQ.currentBook.id, allWords); // 仕様修正2026/09/14
         YNQ.showToast("未実施に戻しました");
       } catch (err) {
         console.error("[wordlist:resetWord]", err);

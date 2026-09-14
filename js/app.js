@@ -607,7 +607,9 @@ YNQ.renderAvatarContent = renderAvatarContent;
 // ログイン中ユーザーの情報をヘッダーのアカウントアイコンに反映する
 // 仕様修正2026/09/12 No.5: 表示文字はユーザーが指定した avatarText(最大2文字・数字可)を優先し、
 // 未設定の場合のみユーザーネームの頭文字にフォールバックする。
-async function loadAccountBadge(user) {
+// preloadedData: 呼び出し元がすでに users/{uid} を読み込み済みの場合、その data() を渡すことで
+// 二重読み取りを避けられる(仕様修正2026/09/14)。省略時はこの関数が自分で読み込む。
+async function loadAccountBadge(user, preloadedData) {
   const badge = document.getElementById("btn-account");
   let username = user.email ? user.email.split("@")[0] : "";
   let text = "", number = "";
@@ -615,9 +617,8 @@ async function loadAccountBadge(user) {
 
   let rank = null;
   try {
-    const doc = await db.collection("users").doc(user.uid).get();
-    if (doc.exists) {
-      const data = doc.data();
+    const data = preloadedData !== undefined ? preloadedData : (await db.collection("users").doc(user.uid).get()).data();
+    if (data) {
       if (data.username) username = data.username;
       if (data.avatarColor) color = data.avatarColor;
       if (data.avatarText) text = data.avatarText.toUpperCase();
@@ -893,12 +894,13 @@ function todayYmd() {
 
 // 仕様D: ログインすると1日1回、ライトランク帯10pt/高ランク帯5ptを付与する(0:00リセット)。
 // ランクがまだ付いていない(Unranked)間は対象外(仕様A参照)。
-async function applyDailyLoginBonusIfNeeded(user) {
+// preloadedData: 呼び出し元がすでに users/{uid} を読み込み済みの場合、その data() を渡すことで
+// 二重読み取りを避けられる(仕様修正2026/09/14)。省略時はこの関数が自分で読み込む。
+async function applyDailyLoginBonusIfNeeded(user, preloadedData) {
   const userRef = db.collection("users").doc(user.uid);
   try {
-    const doc = await userRef.get();
-    if (!doc.exists) return;
-    const data = doc.data();
+    const data = preloadedData !== undefined ? preloadedData : (await userRef.get()).data();
+    if (!data) return;
     const rank = data.rank;
     if (!rank || rank.tier === "Unranked") return;
 
@@ -951,12 +953,13 @@ async function collapsePeriodHistory(userRef, period) {
   }
 }
 
-async function applySeasonalRankCheckIfNeeded(user) {
+// preloadedData: 呼び出し元がすでに users/{uid} を読み込み済みの場合、その data() を渡すことで
+// 二重読み取りを避けられる(仕様修正2026/09/14)。省略時はこの関数が自分で読み込む。
+async function applySeasonalRankCheckIfNeeded(user, preloadedData) {
   const userRef = db.collection("users").doc(user.uid);
   try {
-    const doc = await userRef.get();
-    if (!doc.exists) return;
-    const data = doc.data();
+    const data = preloadedData !== undefined ? preloadedData : (await userRef.get()).data();
+    if (!data) return;
     const rank = data.rank;
     const now = new Date();
     const lastCheck = (data.lastSeasonCheckAt && data.lastSeasonCheckAt.toDate) ? data.lastSeasonCheckAt.toDate() : now;
@@ -997,17 +1000,27 @@ async function applySeasonalRankCheckIfNeeded(user) {
    8. 認証状態の監視(ログイン/ログアウトで画面を切り替える)
    ---------------------------------------------------------- */
 
-auth.onAuthStateChanged((user) => {
+auth.onAuthStateChanged(async (user) => {
   YNQ.currentUser = user;
   if (user) {
     document.getElementById("screen-login").hidden = true;
     document.getElementById("screen-register").hidden = true;
     document.getElementById("app-shell").hidden = false;
     document.getElementById("tab-bar").hidden = false; // 仕様修正2026/09/13 No.2-1: タブバーは常時表示
-    loadAccountBadge(user);
-    applyDailyLoginBonusIfNeeded(user); // 仕様D
-    applySeasonalRankCheckIfNeeded(user); // 仕様Q
-    loadTab("home");
+    loadTab("home"); // users/{uid}の読み込みを待たずに即座にタブ表示を始める
+
+    // 仕様修正2026/09/14: 以下の3関数がそれぞれ独自に users/{uid} を読んでいたため、
+    // 1回の読み取り結果を共有してFirestoreの読み取り量を減らす
+    let userData;
+    try {
+      const doc = await db.collection("users").doc(user.uid).get();
+      userData = doc.exists ? doc.data() : undefined;
+    } catch (err) {
+      console.error("[onAuthStateChanged:userDoc]", err);
+    }
+    loadAccountBadge(user, userData);
+    applyDailyLoginBonusIfNeeded(user, userData); // 仕様D
+    applySeasonalRankCheckIfNeeded(user, userData); // 仕様Q
   } else {
     document.getElementById("app-shell").hidden = true;
     document.getElementById("tab-bar").hidden = true;

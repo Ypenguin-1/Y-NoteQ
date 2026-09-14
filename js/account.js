@@ -14,8 +14,13 @@ window.AccountTab = (function () {
   let currentUsername = "";
 
   function init() {
-    loadProfile();
-    loadRankSummary(); // 仕様追加2026/09/12 No.4
+    // 仕様修正2026/09/14: loadProfileとloadRankSummaryが同じusers/{uid}ドキュメントを
+    // 別々に読んでいたため、1回の読み取りを共有してFirestoreの読み取り量を減らす
+    const userDocPromise = YNQ.db.collection("users").doc(YNQ.currentUser.uid).get()
+      .then(doc => doc.exists ? doc.data() : {})
+      .catch(err => { console.error("[account:init:userDoc]", err); return {}; });
+    loadProfile(userDocPromise);
+    loadRankSummary(userDocPromise); // 仕様追加2026/09/12 No.4
     loadLevelAggregate();
     loadTestHistory();
     bindEvents();
@@ -57,7 +62,7 @@ window.AccountTab = (function () {
   }
 
   /* ---------- ランク(仕様追加2026/09/12 No.4) ---------- */
-  async function loadRankSummary() {
+  async function loadRankSummary(userDataPromise) {
     const nameEl = document.getElementById("rank-summary-name");
     const imgEl = document.getElementById("rank-badge-img");
     const barWrap = document.getElementById("rank-progress-bar");
@@ -65,8 +70,7 @@ window.AccountTab = (function () {
     const pointsEl = document.getElementById("rank-summary-points");
 
     try {
-      const doc = await YNQ.db.collection("users").doc(YNQ.currentUser.uid).get();
-      const data = doc.exists ? doc.data() : {};
+      const data = await userDataPromise;
       const rank = data.rank || { tier: "Unranked", division: null, points: 0 };
       const qualifyingTestCount = data.qualifyingTestCount || 0;
 
@@ -129,7 +133,7 @@ window.AccountTab = (function () {
   }
 
   /* ---------- プロフィール(ユーザーネーム・アイコン) ---------- */
-  async function loadProfile() {
+  async function loadProfile(userDataPromise) {
     const user = YNQ.currentUser;
     document.getElementById("account-email").textContent = user.email || "";
 
@@ -139,14 +143,11 @@ window.AccountTab = (function () {
     let avatarNumber = "";
 
     try {
-      const doc = await YNQ.db.collection("users").doc(user.uid).get();
-      if (doc.exists) {
-        const data = doc.data();
-        if (data.username) username = data.username;
-        if (data.avatarColor) color = data.avatarColor;
-        if (data.avatarText) avatarText = data.avatarText;
-        if (data.avatarNumber) avatarNumber = data.avatarNumber;
-      }
+      const data = await userDataPromise;
+      if (data.username) username = data.username;
+      if (data.avatarColor) color = data.avatarColor;
+      if (data.avatarText) avatarText = data.avatarText;
+      if (data.avatarNumber) avatarNumber = data.avatarNumber;
     } catch (err) {
       console.error("[account:loadProfile]", err);
     }
@@ -229,17 +230,37 @@ window.AccountTab = (function () {
   }
 
   /* ---------- 個人Level(collectionGroupで全単語帳の単語を横断集計) ---------- */
+  // 仕様修正2026/09/14: 読み取り量削減のため、全単語(collectionGroup("words"))を読む代わりに、
+  // 各単語帳ドキュメントに事前計算済みのlevelCounts/wordCountを持たせておき、それを合算する
+  // (単語帳の数だけの読み取りで済み、単語数に比例して読み取り量が増えることがなくなる)。
+  // まだ集計されていない古い単語帳だけ、その場で単語を読んで集計し、書き戻す(自己修復)。
   async function loadLevelAggregate() {
     const bar = document.getElementById("account-level-bar");
     const legend = document.getElementById("account-level-legend");
     try {
-      const snap = await YNQ.db.collectionGroup("words").get();
+      const snap = await YNQ.db.collectionGroup("wordbooks").get();
       const counts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      let total = 0;
+      const legacyBookRefs = [];
       snap.forEach(doc => {
-        const lv = doc.data().level || 0;
-        counts[lv] = (counts[lv] || 0) + 1;
+        const data = doc.data();
+        if (typeof data.wordCount === "number" && data.levelCounts) {
+          [0, 1, 2, 3, 4, 5].forEach(lv => { counts[lv] += data.levelCounts[lv] || 0; });
+          total += data.wordCount;
+        } else {
+          legacyBookRefs.push(doc.ref);
+        }
       });
-      const total = snap.size;
+      if (legacyBookRefs.length > 0) {
+        await Promise.all(legacyBookRefs.map(async (bookRef) => {
+          const wsnap = await bookRef.collection("words").get();
+          const words = wsnap.docs.map(d => d.data());
+          const bookCounts = YNQ.computeLevelCounts(words);
+          [0, 1, 2, 3, 4, 5].forEach(lv => { counts[lv] += bookCounts[lv] || 0; });
+          total += wsnap.size;
+          bookRef.update({ wordCount: wsnap.size, levelCounts: bookCounts }).catch(() => {});
+        }));
+      }
 
       if (total === 0) {
         bar.innerHTML = "";
