@@ -11,6 +11,12 @@ window.EditTab = (function () {
 
   function wordsRef() { return YNQ.wordsCol(YNQ.currentFolder.id, YNQ.currentBook.id); }
 
+  // 仕様追加2026/09/14: 単語帳が未作成の状態からのインポート(単語帳を自動作成)で使う
+  function uid() { return YNQ.currentUser && YNQ.currentUser.uid; }
+  function foldersCol() { return YNQ.db.collection("users").doc(uid()).collection("folders"); }
+  function booksCol(folderId) { return foldersCol().doc(folderId).collection("wordbooks"); }
+  const DEFAULT_NEW_ITEM_COLOR = "#F2CF00";
+
   /* ---------- 初期表示 ---------- */
   function init() {
     const hasBook = !!(YNQ.currentFolder && YNQ.currentBook);
@@ -18,10 +24,118 @@ window.EditTab = (function () {
     document.getElementById("edit-content").hidden = !hasBook;
     if (!hasBook) {
       document.getElementById("btn-edit-goto-folders").addEventListener("click", () => YNQ.loadTab("home"));
+      initEmptyStateImport();
       return;
     }
     bindEvents();
     loadWords();
+  }
+
+  // 仕様追加2026/09/14: 単語帳を開いていない状態でも、CSV/Excelファイルから新しい単語帳を
+  // 作成してインポートできるようにする(「編集」タブ)
+  async function initEmptyStateImport() {
+    const select = document.getElementById("edit-empty-folder-select");
+    const newFolderWrap = document.getElementById("edit-empty-new-folder-wrap");
+
+    function updateNewFolderWrapVisibility() {
+      newFolderWrap.hidden = select.value !== "__new__";
+    }
+    updateNewFolderWrapVisibility();
+    select.addEventListener("change", updateNewFolderWrapVisibility);
+
+    document.getElementById("edit-empty-import-file-input").addEventListener("change", handleImportFileNoBook);
+
+    try {
+      const snap = await foldersCol().orderBy("order", "asc").get();
+      snap.docs.forEach(d => {
+        const opt = document.createElement("option");
+        opt.value = d.id;
+        opt.textContent = d.data().name;
+        select.appendChild(opt);
+      });
+    } catch (err) {
+      console.error("[edit:initEmptyStateImport]", err);
+    }
+  }
+
+  async function handleImportFileNoBook(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const select = document.getElementById("edit-empty-folder-select");
+    const creatingNewFolder = select.value === "__new__";
+    const newFolderName = document.getElementById("edit-empty-new-folder-name").value.trim();
+    if (creatingNewFolder && !newFolderName) {
+      YNQ.showToast("新しいフォルダー名を入力してください");
+      e.target.value = "";
+      return;
+    }
+
+    try {
+      const { parsed } = await parseImportFile(file);
+      if (parsed.length === 0) { YNQ.showToast("インポートできるデータが見つかりませんでした"); e.target.value = ""; return; }
+
+      // 通し番号が空だった行には1から自動で振る(新規単語帳のため既存データはない)
+      let autoNo = 1;
+      parsed.forEach(p => { if (p.no === null) p.no = autoNo++; });
+
+      const bookName = file.name.replace(/\.(csv|xlsx|xls)$/i, "").trim() || "インポートした単語帳";
+
+      YNQ.confirmDialog(
+        `${parsed.length}件のデータを読み込みました。新しい単語帳「${bookName}」を作成してインポートしますか?`,
+        async () => {
+          try {
+            let folderId = select.value;
+            let folderName = select.options[select.selectedIndex].textContent;
+            if (creatingNewFolder) {
+              const folderRef = await foldersCol().add({
+                name: newFolderName, description: "", color: DEFAULT_NEW_ITEM_COLOR,
+                order: Date.now(), bookCount: 1, // このあと単語帳を1件作るため最初から1にしておく
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+              folderId = folderRef.id;
+              folderName = newFolderName;
+            } else {
+              foldersCol().doc(folderId)
+                .update({ bookCount: firebase.firestore.FieldValue.increment(1) })
+                .catch(err => console.error("[edit:handleImportFileNoBook:bookCount]", err));
+            }
+
+            const bookRef = await booksCol(folderId).add({
+              name: bookName, description: "", color: DEFAULT_NEW_ITEM_COLOR,
+              order: Date.now(),
+              wordCount: parsed.length, levelCounts: YNQ.computeLevelCounts(parsed), // 読み取り量削減用の事前集計
+              createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+              updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+
+            await commitInChunks(parsed, (batch, p) => {
+              batch.set(bookRef.collection("words").doc(), {
+                no: p.no, word: p.word, meaning: p.meaning, level: p.level,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+              });
+            });
+
+            YNQ.currentFolder = { id: folderId, name: folderName, color: DEFAULT_NEW_ITEM_COLOR };
+            YNQ.currentBook = { id: bookRef.id, name: bookName, color: DEFAULT_NEW_ITEM_COLOR };
+            const titleEl = document.getElementById("header-booktitle");
+            if (titleEl) titleEl.textContent = bookName;
+            YNQ.showToast(`単語帳「${bookName}」を作成し、${parsed.length}件をインポートしました`);
+            YNQ.loadTab("edit");
+          } catch (err) {
+            console.error("[edit:handleImportFileNoBook:commit]", err);
+            YNQ.showToast("インポートに失敗しました");
+          }
+        },
+        "インポートする", false
+      );
+    } catch (err) {
+      console.error("[edit:handleImportFileNoBook]", err);
+      YNQ.showToast("ファイルの読み込みに失敗しました。CSV/Excel形式をご確認ください");
+    } finally {
+      e.target.value = "";
+    }
   }
 
   async function loadWords() {
@@ -179,37 +293,54 @@ window.EditTab = (function () {
     return rows;
   }
 
+  // 仕様修正2026/09/14: セル内の改行コードはExcel/CSVの出どころによって \r\n・\r・\n が
+  // 混在しうるため、常に \n に統一しておく(表示側のwhite-space:pre-lineは全パターンを改行として
+  // 扱うが、保存するデータ自体は正規化しておいたほうが一貫性があり、以後の再インポート/編集でも安全)。
+  function normalizeLineBreaks(str) {
+    return String(str ?? "").replace(/\r\n|\r/g, "\n");
+  }
+
+  // CSV/Excelファイルを読み込み、見出し行を除いた {no, word, meaning, level} の配列にして返す。
+  // 単語帳が開かれているときの再インポート(handleImportFile)・単語帳が未作成の状態からの
+  // 新規作成インポート(handleImportFileNoBook)の両方から共通で使う。
+  async function parseImportFile(file) {
+    const isCsv = /\.csv$/i.test(file.name);
+    let rows;
+    if (isCsv) {
+      const text = await file.text();
+      rows = parseCsvText(text);
+    } else {
+      const data = await file.arrayBuffer();
+      const wb = XLSX.read(data, { type: "array", raw: true });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: true });
+    }
+    const dataRows = rows.slice(1); // 仕様#87: 1行目は見出しなので2行目から
+
+    const parsed = [];
+    dataRows.forEach(row => {
+      if (!row || row.length === 0) return;
+      // 仕様修正2026/09/14: 単語・意味に含まれる改行情報(セル内の複数行テキスト)を
+      // CSV/Excelどちらの形式でも確実に保持する(改行コードは\nに正規化)
+      const word = normalizeLineBreaks(row[1]).trim();
+      const meaning = normalizeLineBreaks(row[2]).trim();
+      if (!word && !meaning) return; // 空行はスキップ
+
+      const noRaw = parseInt(row[0], 10);
+      let level = parseInt(row[3], 10);
+      if (isNaN(level)) level = 0; // 仕様#88: 空欄は0判定
+      level = Math.max(0, Math.min(5, level)); // Levelは0〜5の範囲にクランプ
+
+      parsed.push({ no: isNaN(noRaw) ? null : noRaw, word, meaning, level });
+    });
+    return { isCsv, parsed };
+  }
+
   async function handleImportFile(e) {
     const file = e.target.files[0];
     if (!file) return;
     try {
-      const isCsv = /\.csv$/i.test(file.name);
-      let rows;
-      if (isCsv) {
-        const text = await file.text();
-        rows = parseCsvText(text);
-      } else {
-        const data = await file.arrayBuffer();
-        const wb = XLSX.read(data, { type: "array" });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
-      }
-      const dataRows = rows.slice(1); // 仕様#87: 1行目は見出しなので2行目から
-
-      const parsed = [];
-      dataRows.forEach(row => {
-        if (!row || row.length === 0) return;
-        const word = String(row[1] ?? "").trim();
-        const meaning = String(row[2] ?? "").trim();
-        if (!word && !meaning) return; // 空行はスキップ
-
-        const noRaw = parseInt(row[0], 10);
-        let level = parseInt(row[3], 10);
-        if (isNaN(level)) level = 0; // 仕様#88: 空欄は0判定
-        level = Math.max(0, Math.min(5, level)); // Levelは0〜5の範囲にクランプ
-
-        parsed.push({ no: isNaN(noRaw) ? null : noRaw, word, meaning, level });
-      });
+      const { isCsv, parsed } = await parseImportFile(file);
 
       if (parsed.length === 0) { YNQ.showToast("インポートできるデータが見つかりませんでした"); e.target.value = ""; return; }
 
