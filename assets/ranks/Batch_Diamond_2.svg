@@ -1,9 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
-  <!-- プレースホルダー画像(仕様追加2026/09/12 ランク制度)。本番用の画像が届いたら同じファイル名で差し替えてください。 -->
-
-  <path d="M60 8 L104 26 L104 62 C104 90 84 106 60 114 C36 106 16 90 16 62 L16 26 Z"
-        fill="#8fc4f5" stroke="#3d7fd1" stroke-width="4"/>
-  <text x="60" y="66" text-anchor="middle" font-family="Arial, sans-serif" font-size="18" font-weight="800" fill="#3d7fd1">Diamond</text>
-  <text x="60" y="92" text-anchor="middle" font-family="Georgia, serif" font-size="22" font-weight="700" fill="#3d7fd1">II</text>
-
-</svg>
