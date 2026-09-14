@@ -6,10 +6,35 @@
 <div id="edit-tab-root">
 
   <!-- 単語帳が開かれていない場合 -->
-  <div id="edit-empty" class="placeholder-card" hidden>
-    <i class="fa-solid fa-book-open"></i>
-    <p>単語帳が選択されていません。<br>「フォルダー」タブから単語帳を開いてください。</p>
-    <button type="button" class="btn btn-primary" id="btn-edit-goto-folders" style="margin-top:16px;">フォルダーへ移動</button>
+  <div id="edit-empty" hidden>
+    <div class="placeholder-card">
+      <i class="fa-solid fa-book-open"></i>
+      <p>単語帳が選択されていません。<br>「フォルダー」タブから単語帳を開くか、下記からCSV/Excelファイルを直接インポートして新しい単語帳を作成できます。</p>
+      <button type="button" class="btn btn-primary" id="btn-edit-goto-folders" style="margin-top:16px;">フォルダーへ移動</button>
+    </div>
+
+    <!-- 仕様追加2026/09/14: 単語帳を事前に作成していなくても、ファイルから新規単語帳を作成してインポートできるようにする -->
+    <section class="panel">
+      <h2 class="panel-title"><i class="fa-solid fa-file-import"></i> ファイルから新しい単語帳を作成</h2>
+      <p style="font-size:13px;color:var(--color-text-muted);line-height:1.7;margin:0 0 14px;">
+        1列目: 通し番号 / 2列目: 単語 / 3列目: 意味 / 4列目: 暗記度(0〜5、空欄は0)<br>
+        1行目は見出しとして扱われ、2行目からインポートされます。単語帳名にはファイル名(拡張子を除く)が使われます。
+      </p>
+      <div class="field">
+        <label for="edit-empty-folder-select">インポート先のフォルダー</label>
+        <select id="edit-empty-folder-select">
+          <option value="__new__">+ 新しいフォルダーを作成</option>
+        </select>
+      </div>
+      <div class="field" id="edit-empty-new-folder-wrap">
+        <label for="edit-empty-new-folder-name">新しいフォルダー名</label>
+        <input type="text" id="edit-empty-new-folder-name" placeholder="例: TOEIC対策" maxlength="40">
+      </div>
+      <div class="field">
+        <label for="edit-empty-import-file-input">CSV / Excel ファイル</label>
+        <input type="file" id="edit-empty-import-file-input" accept=".csv,.xlsx,.xls">
+      </div>
+    </section>
   </div>
 
   <div id="edit-content" hidden>
