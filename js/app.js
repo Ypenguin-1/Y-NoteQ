@@ -8,16 +8,15 @@
    0. 設定値・定数
    ---------------------------------------------------------- */
 
-// Firebase プロジェクト設定(ユーザー提供の値)
+// Firebase プロジェクト設定(ユーザー提供の値。2026/09/14にプロジェクトをyp-y-noteqへ移行)
 const firebaseConfig = {
-  apiKey: "AIzaSyC4X91yGIZkHxj3xPOAnc_R5uuCVw0iwtI",
-  authDomain: "y-noteq-a.firebaseapp.com",
-  databaseURL: "https://y-noteq-a-default-rtdb.firebaseio.com",
-  projectId: "y-noteq-a",
-  storageBucket: "y-noteq-a.firebasestorage.app",
-  messagingSenderId: "500955780666",
-  appId: "1:500955780666:web:88ba469096c53525590703",
-  measurementId: "G-SWPW6NYML4"
+  apiKey: "AIzaSyCkFxKJ9H28n_nNs8YxPMEuCW9NSt0fkCw",
+  authDomain: "yp-y-noteq.firebaseapp.com",
+  projectId: "yp-y-noteq",
+  storageBucket: "yp-y-noteq.firebasestorage.app",
+  messagingSenderId: "924271334617",
+  appId: "1:924271334617:web:dfab5c74c9beaea2d0dac8",
+  measurementId: "G-Z0TCC5B540"
 };
 
 firebase.initializeApp(firebaseConfig);
