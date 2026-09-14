@@ -19,6 +19,30 @@ window.FoldersTab = (function () {
   function wordsCol(folderId, bookId) { return booksCol(folderId).doc(bookId).collection("words"); }
   YNQ.wordsCol = wordsCol; // js/wordlist.js から参照するため公開
 
+  // 仕様修正2026/09/14: Firestoreの読み取り量削減のため、単語帳の件数・Level別集計を
+  // 単語帳ドキュメント自体に事前計算して持たせておく(フォルダー一覧・単語帳一覧・アカウントタブの
+  // 集計表示が、単語を1件ずつ読みに行かずにこの事前計算値を読むだけで済むようにする)。
+  // 単語の追加/編集/削除のたびに、その時点でメモリ上にある単語配列から計算して書き込むだけなので、
+  // 追加のFirestore読み取りは発生しない。
+  function computeLevelCounts(words) {
+    const counts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    (words || []).forEach(w => { const lv = w.level || 0; counts[lv] = (counts[lv] || 0) + 1; });
+    return counts;
+  }
+  YNQ.computeLevelCounts = computeLevelCounts;
+
+  async function updateBookStats(folderId, bookId, words) {
+    try {
+      await booksCol(folderId).doc(bookId).update({
+        wordCount: words.length,
+        levelCounts: computeLevelCounts(words)
+      });
+    } catch (err) {
+      console.error("[folders:updateBookStats]", err);
+    }
+  }
+  YNQ.updateBookStats = updateBookStats; // js/edit.js・js/wordlist.js・js/test.js から参照するため公開
+
   /* ---------- 初期表示 ---------- */
   function init() {
     bindStaticEvents();
@@ -102,27 +126,38 @@ window.FoldersTab = (function () {
     }
   }
 
-  // 各単語帳の中の単語を集計し、カード内にLevel別のミニ進捗バーを表示する
+  function renderBookProgressEl(el, total, counts) {
+    if (total === 0) {
+      el.innerHTML = `<span class="item-progress-empty">単語なし</span>`;
+      return;
+    }
+    const order = [1, 2, 3, 4, 5, 0]; // 仕様#45と同じ並び順
+    el.innerHTML = `
+      <div class="item-progress-bar">${order.map(lv => {
+        const pct = ((counts[lv] || 0) / total) * 100;
+        return pct > 0 ? `<div class="item-progress-seg" style="width:${pct}%;background:${YNQ.LEVEL_COLORS[lv]}" title="Level${lv}: ${counts[lv]}件"></div>` : "";
+      }).join("")}</div>
+      <span class="item-progress-count">${total}語</span>`;
+  }
+
+  // 各単語帳のLevel別ミニ進捗バーを表示する。仕様修正2026/09/14: 単語帳ドキュメントに事前計算済みの
+  // wordCount/levelCountsがあれば追加の読み取りなしでそのまま表示する。まだ集計されていない
+  // 古いデータの単語帳だけ、その場で単語を読んで集計し、次回のためにFirestoreへ書き戻す(自己修復)。
   async function loadBookProgress(folderId, books) {
     await Promise.all(books.map(async (b) => {
       const el = document.querySelector(`.item-progress[data-book-id="${CSS.escape(b.id)}"]`);
       if (!el) return;
+      if (typeof b.wordCount === "number" && b.levelCounts) {
+        renderBookProgressEl(el, b.wordCount, b.levelCounts);
+        return;
+      }
       try {
         const wsnap = await wordsCol(folderId, b.id).get();
-        const counts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-        wsnap.forEach(d => { const lv = d.data().level || 0; counts[lv] = (counts[lv] || 0) + 1; });
+        const words = wsnap.docs.map(d => d.data());
+        const counts = computeLevelCounts(words);
         const total = wsnap.size;
-        if (total === 0) {
-          el.innerHTML = `<span class="item-progress-empty">単語なし</span>`;
-          return;
-        }
-        const order = [1, 2, 3, 4, 5, 0]; // 仕様#45と同じ並び順
-        el.innerHTML = `
-          <div class="item-progress-bar">${order.map(lv => {
-            const pct = (counts[lv] / total) * 100;
-            return pct > 0 ? `<div class="item-progress-seg" style="width:${pct}%;background:${YNQ.LEVEL_COLORS[lv]}" title="Level${lv}: ${counts[lv]}件"></div>` : "";
-          }).join("")}</div>
-          <span class="item-progress-count">${total}語</span>`;
+        renderBookProgressEl(el, total, counts);
+        booksCol(folderId).doc(b.id).update({ wordCount: total, levelCounts: counts }).catch(() => {});
       } catch (err) {
         console.error("[folders:loadBookProgress]", err);
         el.innerHTML = `<span class="item-progress-empty">取得失敗</span>`;
@@ -130,14 +165,20 @@ window.FoldersTab = (function () {
     }));
   }
 
-  // 各フォルダーの中の単語帳数を集計し、カードに表示する(仕様#8)
+  // 各フォルダーの中の単語帳数を表示する(仕様#8)。仕様修正2026/09/14: フォルダードキュメントに
+  // 事前計算済みのbookCountがあれば追加の読み取りなしで表示し、無い古いデータだけその場で数えて書き戻す。
   async function loadFolderCounts(folders) {
     await Promise.all(folders.map(async (f) => {
       const el = document.querySelector(`.item-card-count[data-count-folder-id="${CSS.escape(f.id)}"]`);
       if (!el) return;
+      if (typeof f.bookCount === "number") {
+        el.innerHTML = `<i class="fa-solid fa-book"></i> ${f.bookCount}単語帳`;
+        return;
+      }
       try {
         const snap = await booksCol(f.id).get();
         el.innerHTML = `<i class="fa-solid fa-book"></i> ${snap.size}単語帳`;
+        foldersCol().doc(f.id).update({ bookCount: snap.size }).catch(() => {});
       } catch (err) {
         console.error("[folders:loadFolderCounts]", err);
         el.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> 取得失敗`;
@@ -277,12 +318,26 @@ window.FoldersTab = (function () {
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
       } else {
-        await col.add({
+        const initData = {
           name, description, color: editState.color,
           order: Date.now(),
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
+        };
+        // 仕様修正2026/09/14: 読み取り量削減のため、件数・Level集計を作成時点から0で持たせておく
+        if (editState.mode === "folder") {
+          initData.bookCount = 0;
+        } else {
+          initData.wordCount = 0;
+          initData.levelCounts = { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        }
+        await col.add(initData);
+        if (editState.mode === "book") {
+          // 単語帳を新規作成したら、親フォルダーの単語帳数を+1する(追加の読み取りは発生しない)
+          foldersCol().doc(YNQ.currentFolder.id)
+            .update({ bookCount: firebase.firestore.FieldValue.increment(1) })
+            .catch(err => console.error("[folders:saveItem:bookCount]", err));
+        }
       }
       YNQ.closeModal("modal-item-edit");
       YNQ.showToast(editState.id ? "更新しました" : "作成しました");
@@ -321,6 +376,11 @@ window.FoldersTab = (function () {
     const wordsSnap = await wordsCol(folderId, bookId).get();
     await Promise.all(wordsSnap.docs.map(d => d.ref.delete()));
     await booksCol(folderId).doc(bookId).delete();
+    // 親フォルダーの単語帳数を-1する(仕様修正2026/09/14。フォルダーごと削除される場合は
+    // このあとフォルダー自体も削除されるため無害)
+    foldersCol().doc(folderId)
+      .update({ bookCount: firebase.firestore.FieldValue.increment(-1) })
+      .catch(() => {});
   }
 
   // フォルダーを削除する前に、中の単語帳を(その中の単語ごと)すべて削除する

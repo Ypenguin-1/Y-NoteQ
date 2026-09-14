@@ -210,6 +210,10 @@ window.ShareTab = (function () {
           createdAt: firebase.firestore.FieldValue.serverTimestamp(),
           updatedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
+        // 単語帳を新規作成したので、親フォルダーの単語帳数を+1する(仕様修正2026/09/14)
+        foldersCol().doc(folderId)
+          .update({ bookCount: firebase.firestore.FieldValue.increment(1) })
+          .catch(err => console.error("[share:installSharedBook:bookCount]", err));
 
         const wordsSnap = await sharedCol().doc(shared.id).collection("words").orderBy("no", "asc").get();
         const batch = YNQ.db.batch();
@@ -222,6 +226,12 @@ window.ShareTab = (function () {
           });
         });
         await batch.commit();
+        // 仕様修正2026/09/14: インストールした単語帳(全単語Level0)の事前集計を書き込んでおく
+        // (読み取り量削減。js/folders.jsのフォルダー一覧・単語帳一覧側がこの値を利用する)
+        newBookRef.update({
+          wordCount: wordsSnap.size,
+          levelCounts: { 0: wordsSnap.size, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+        }).catch(() => {});
         YNQ.showToast("インストールしました(「共有された単語帳」フォルダーに追加されました)");
       } catch (err) {
         console.error("[share:installSharedBook]", err);
@@ -258,6 +268,7 @@ window.ShareTab = (function () {
       description: "「共有」タブからインストールした単語帳が入ります",
       color: "#0ea5e9",
       order: Date.now(),
+      bookCount: 0, // 仕様修正2026/09/14: 読み取り量削減のための事前集計フィールド
       createdAt: firebase.firestore.FieldValue.serverTimestamp(),
       updatedAt: firebase.firestore.FieldValue.serverTimestamp()
     });
