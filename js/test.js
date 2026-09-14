@@ -189,7 +189,7 @@ window.TestTab = (function () {
       <tr>
         <td style="border:1px solid #ccc;padding:8px;">${i + 1}</td>
         <td style="border:1px solid #ccc;padding:8px;">${YNQ.pad4(w.no)}</td>
-        <td style="border:1px solid #ccc;padding:8px;font-size:16px;">${YNQ.escapeHtml(firstAlt(w[promptField]))}</td>
+        <td style="border:1px solid #ccc;padding:8px;font-size:16px;white-space:pre-line;">${YNQ.escapeHtml(firstAlt(w[promptField]))}</td>
         <td style="border:1px solid #ccc;padding:8px;width:220px;"></td>
       </tr>`).join("");
     const wrap = document.createElement("div");
